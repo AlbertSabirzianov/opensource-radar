@@ -1,4 +1,15 @@
-function IssueCard({ title, description, label, language, repo, url }) {
+import Icon from "./Icon";
+
+function IssueCard({
+  title,
+  description,
+  label,
+  language,
+  repo,
+  url,
+  saved,
+  onToggleSave,
+}) {
   const cleanDescription = (description || "No description provided.")
     .replace(/```[\s\S]*?```/g, " ")
     .replace(/`[^`]*`/g, " ")
@@ -21,7 +32,21 @@ function IssueCard({ title, description, label, language, repo, url }) {
     <article className="issue-card">
       <div className="issue-card-header">
         <span className="issue-label">{label}</span>
-        <span className="issue-language">{language}</span>
+        <div className="issue-card-meta">
+          <span className="issue-language">{language}</span>
+          {onToggleSave && (
+            <button
+              type="button"
+              className={`icon-button issue-save${saved ? " issue-save-active" : ""}`}
+              aria-pressed={saved}
+              aria-label={saved ? `Remove "${title}" from saved` : `Save "${title}"`}
+              title={saved ? "Remove from saved" : "Save issue"}
+              onClick={onToggleSave}
+            >
+              <Icon name={saved ? "bookmarkFilled" : "bookmark"} />
+            </button>
+          )}
+        </div>
       </div>
 
       <h2>{title}</h2>

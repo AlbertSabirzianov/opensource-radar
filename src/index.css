@@ -1,12 +1,101 @@
 :root {
+  /* GitHub Primer light theme (@primer/primitives v11.10.0) */
+  --bg: #ffffff;
+  --surface: #ffffff;
+  --nav-bg: #f6f8fa;
+  --control-bg: #f6f8fa;
+  --control-bg-hover: #eff2f5;
+  --text: #1f2328;
+  --text-root: #1f2328;
+  --text-strong: #25292e;
+  --text-soft: #59636e;
+  --text-filter: #25292e;
+  --text-select: #25292e;
+  --muted: #59636e;
+  --link: #0969da;
+  --accent: #0969da;
+  --on-accent: #ffffff;
+  --primary: #1f883d;
+  --primary-hover: #1c8139;
+  --primary-border: #1f232826;
+  --border-nav: #d1d9e0;
+  --border-input: #d1d9e0;
+  --border-select: #d1d9e0;
+  --border-card: #d1d9e0;
+  --focus: #0969da;
+  --focus-ring: rgba(9, 105, 218, 0.3);
+  --label-text: #1a7f37;
+  --label-bg: #dafbe1;
+  --shadow: #1f23280a;
+  --shadow-hover: #25292e1f;
+  --notice-text: #9a6700;
+  --notice-bg: #fff8c5;
+  --notice-border: #d4a72c66;
+  --overlay-bg: #ffffff;
+  --overlay-shadow: 0 0 0 1px #d1d9e040, 0 6px 12px -3px #25292e0a,
+    0 6px 18px 0 #25292e1f;
+  --overlay-backdrop: #c8d1da66;
+  --menu-hover: #818b981a;
+  --danger: #d1242f;
+  --success: #1a7f37;
+  --done: #8250df;
+  --counter-bg: #818b981f;
+
+  color-scheme: light;
   font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont,
     "Segoe UI", sans-serif;
-  color: #1f2937;
-  background: #f8fafc;
+  color: var(--text-root);
+  background: var(--bg);
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+:root[data-theme="dark"] {
+  /* GitHub Primer dark theme (@primer/primitives v11.10.0) */
+  --bg: #0d1117;
+  --surface: #0d1117;
+  --nav-bg: #010409;
+  --control-bg: #212830;
+  --control-bg-hover: #262c36;
+  --text: #f0f6fc;
+  --text-root: #f0f6fc;
+  --text-strong: #f0f6fc;
+  --text-soft: #9198a1;
+  --text-filter: #f0f6fc;
+  --text-select: #f0f6fc;
+  --muted: #9198a1;
+  --link: #4493f8;
+  --accent: #1f6feb;
+  --on-accent: #ffffff;
+  --primary: #238636;
+  --primary-hover: #29903b;
+  --primary-border: #ffffff26;
+  --border-nav: #3d444d;
+  --border-input: #3d444d;
+  --border-select: #3d444d;
+  --border-card: #3d444d;
+  --focus: #1f6feb;
+  --focus-ring: rgba(31, 111, 235, 0.3);
+  --label-text: #3fb950;
+  --label-bg: #2ea04326;
+  --shadow: #01040999;
+  --shadow-hover: #010409cc;
+  --notice-text: #d29922;
+  --notice-bg: #bb800926;
+  --notice-border: #bb800966;
+  --overlay-bg: #010409;
+  --overlay-shadow: 0 0 0 1px #3d444d, 0 6px 12px -3px #01040966,
+    0 6px 18px 0 #01040966;
+  --overlay-backdrop: #21283066;
+  --menu-hover: #656c7633;
+  --danger: #f85149;
+  --success: #3fb950;
+  --done: #ab7df8;
+  --counter-bg: #656c7633;
+
+  color-scheme: dark;
 }
 
 * {

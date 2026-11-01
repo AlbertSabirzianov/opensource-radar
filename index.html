@@ -5,6 +5,20 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>opensource-radar</title>
+    <script>
+      // Apply the saved theme before first paint to avoid a light flash.
+      try {
+        var theme = localStorage.getItem("opensource-radar-theme");
+        if (theme !== "light" && theme !== "dark") {
+          theme = matchMedia("(prefers-color-scheme: dark)").matches
+            ? "dark"
+            : "light";
+        }
+        document.documentElement.dataset.theme = theme;
+      } catch (e) {
+        // Storage unavailable; the app falls back to light.
+      }
+    </script>
   </head>
   <body>
     <div id="root"></div>
