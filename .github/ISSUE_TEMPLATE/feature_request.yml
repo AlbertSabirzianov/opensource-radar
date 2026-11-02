@@ -1,0 +1,22 @@
+name: Feature request
+description: Suggest an idea to make OpenSource Radar better.
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What would you like to do?
+      description: Describe what you're trying to do, or what's hard today.
+      placeholder: I'd like to see only issues from projects that are still active.
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: Your idea
+      description: How could the site help? A sketch or example is welcome.
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Anything else?
+      description: Other ideas you considered, or examples from other sites.
