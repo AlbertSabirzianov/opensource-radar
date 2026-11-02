@@ -403,6 +403,28 @@ function App() {
       sort: search.filters.sort,
     });
 
+  // The site title goes back to the starting search without reloading.
+  // Ctrl/Cmd/Shift-click or a middle click still opens it like a normal link.
+  const goHome = (event) => {
+    if (
+      event.button !== 0 ||
+      event.metaKey ||
+      event.ctrlKey ||
+      event.shiftKey ||
+      event.altKey
+    ) {
+      return;
+    }
+
+    event.preventDefault();
+    setInputText("");
+    setRecommendation(null);
+    setFiltersOpen(false);
+    setView("search");
+    setSearch({ filters: DEFAULT_FILTERS, text: "", page: 1 });
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
   const goToPage = (page) => {
     setSearch((current) => ({ ...current, page }));
     scrollToResults();
@@ -506,7 +528,9 @@ function App() {
   return (
     <main className="app">
       <nav className="navbar">
-        <h2>OpenSource Radar</h2>
+        <a className="navbar-brand" href="/" onClick={goHome}>
+          OpenSource Radar
+        </a>
         <div className="nav-actions">
           <NavMenu
             themePreference={themePreference}
