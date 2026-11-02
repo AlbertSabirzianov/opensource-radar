@@ -79,6 +79,41 @@ export async function fetchUser(accessToken) {
   }
 }
 
+// Looks up several repositories in one GraphQL request. Returns one entry
+// per name (null when the repository doesn't exist or can't be read).
+export async function fetchRepositories(accessToken, names) {
+  const variables = {};
+  const params = [];
+  const fields = names.map((name, index) => {
+    const [owner, repo] = name.split("/");
+    variables[`o${index}`] = owner;
+    variables[`n${index}`] = repo;
+    params.push(`$o${index}: String!, $n${index}: String!`);
+    return `r${index}: repository(owner: $o${index}, name: $n${index}) {
+      stargazerCount
+      pushedAt
+      isArchived
+      contributingGuidelines { url }
+    }`;
+  });
+
+  const response = await fetch("https://api.github.com/graphql", {
+    method: "POST",
+    headers: { ...githubHeaders(accessToken), "Content-Type": "application/json" },
+    body: JSON.stringify({
+      query: `query(${params.join(", ")}) { ${fields.join("\n")} }`,
+      variables,
+    }),
+  });
+  if (!response.ok) {
+    throw new Error(`GitHub GraphQL request failed (${response.status})`);
+  }
+
+  // Missing repositories come back as null plus an entry in `errors`.
+  const { data } = await response.json();
+  return names.map((_, index) => data?.[`r${index}`] ?? null);
+}
+
 // Best effort: a failed revoke still signs the user out locally.
 export async function revokeToken(config, accessToken) {
   try {

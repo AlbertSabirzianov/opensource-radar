@@ -1254,3 +1254,52 @@ body {
   color: var(--muted);
   font-size: 12px;
 }
+
+.issue-card-labels {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+.project-warning {
+  padding: 5px 10px;
+  border-radius: 999px;
+  background: var(--notice-bg);
+  color: var(--notice-text);
+  font-size: 13px;
+}
+
+.project-warning-archived {
+  background: var(--counter-bg);
+  color: var(--danger);
+}
+
+.issue-stars {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  margin-left: 8px;
+  color: var(--muted);
+}
+
+.issue-stars svg {
+  width: 14px;
+  height: 14px;
+}
+
+.issue-card-links {
+  display: inline-flex;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.filter-popular {
+  margin-top: 4px;
+}
+
+.filter-popular:has(input:disabled) {
+  color: var(--muted);
+  cursor: not-allowed;
+}

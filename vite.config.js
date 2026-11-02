@@ -13,6 +13,7 @@ const SERVER_ENV_KEYS = [
   'UPSTASH_REDIS_REST_TOKEN',
   'REPORT_GITHUB_TOKEN',
   'REPORT_REPO',
+  'GITHUB_READ_TOKEN',
 ]
 
 function readBody(req) {

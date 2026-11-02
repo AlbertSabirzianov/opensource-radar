@@ -11,6 +11,7 @@ const PREVIEW_LENGTH = 180;
 export function previewText(description) {
   const clean = (description || "No description provided.")
     .slice(0, SOURCE_LENGTH)
+    .replace(/<!--[\s\S]*?(?:-->|$)/g, " ")
     .replace(/```[\s\S]*?```/g, " ")
     .replace(/`[^`\n]*`/g, " ")
     .replace(/!\[([^\]\n]{0,200})\]\([^)\n]{1,500}\)/g, "$1")

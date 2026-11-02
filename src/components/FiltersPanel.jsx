@@ -20,6 +20,7 @@ function FiltersPanel({ id, filters, onApply, onClose }) {
   const languageId = useId();
   const sortId = useId();
   const projectHintId = useId();
+  const popularHintId = useId();
 
   useEffect(() => {
     panelRef.current?.querySelector("input, select")?.focus();
@@ -154,6 +155,22 @@ function FiltersPanel({ id, filters, onApply, onClose }) {
             {projectValid
               ? "Leave empty to search every project."
               : "Use a name like vercel or vercel/next.js."}
+          </p>
+
+          <label className="filter-option filter-popular">
+            <input
+              type="checkbox"
+              checked={draft.popular && !project}
+              disabled={Boolean(project)}
+              aria-describedby={popularHintId}
+              onChange={(event) => update({ popular: event.target.checked })}
+            />
+            Popular, active projects only
+          </label>
+          <p id={popularHintId} className="filter-hint">
+            {project
+              ? "Not used when a project is chosen above."
+              : "1,000+ stars and updated in the last month."}
           </p>
 
           <label className="filter-label" htmlFor={sortId}>
