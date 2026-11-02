@@ -3,7 +3,17 @@ import { existsSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { defineConfig, loadEnv } from 'vite'
 
-const SERVER_ENV_KEYS = ['GITHUB_CLIENT_ID', 'GITHUB_CLIENT_SECRET', 'SESSION_SECRET']
+const SERVER_ENV_KEYS = [
+  'GITHUB_CLIENT_ID',
+  'GITHUB_CLIENT_SECRET',
+  'SESSION_SECRET',
+  'KV_REST_API_URL',
+  'KV_REST_API_TOKEN',
+  'UPSTASH_REDIS_REST_URL',
+  'UPSTASH_REDIS_REST_TOKEN',
+  'REPORT_GITHUB_TOKEN',
+  'REPORT_REPO',
+]
 
 function readBody(req) {
   return new Promise((resolve, reject) => {
@@ -65,7 +75,7 @@ function vercelFunctions() {
 
 // https://vite.dev/config/
 export default defineConfig(({ mode }) => {
-  // Hand the sign-in secrets from .env.local to the functions above. They
+  // Hand the server-side settings from .env.local to the functions above. They
   // never reach the browser: Vite only exposes VITE_-prefixed variables.
   const env = loadEnv(mode, process.cwd(), '')
   for (const key of SERVER_ENV_KEYS) {
