@@ -1,0 +1,50 @@
+name: Bug report
+description: Something on the site isn't working as it should.
+labels: ["bug"]
+body:
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: What did you do, and what went wrong?
+      placeholder: I picked Python in Filters, but the results still showed Java issues.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What did you expect?
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Open the site
+        2. Click Filters
+        3. ...
+  - type: input
+    id: link
+    attributes:
+      label: Link to the search (optional)
+      description: The site keeps your search in the address bar, so copying the link helps us see exactly what you saw.
+  - type: dropdown
+    id: browser
+    attributes:
+      label: Browser
+      options:
+        - Chrome
+        - Safari
+        - Firefox
+        - Edge
+        - Brave
+        - Other
+  - type: dropdown
+    id: device
+    attributes:
+      label: Device
+      options:
+        - Computer
+        - Phone
+        - Tablet
