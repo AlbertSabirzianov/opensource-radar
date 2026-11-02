@@ -71,53 +71,9 @@ function FiltersPanel({ id, filters, onApply, onClose }) {
         </button>
       </div>
 
-      <div className="filters-grid">
-        <fieldset className="filter-group">
-          <legend>Type of issue</legend>
-          {Object.entries(LABELS).map(([key, { name }]) => (
-            <label key={key} className="filter-option">
-              <input
-                type="checkbox"
-                checked={draft.labels.includes(key)}
-                onChange={() => toggleLabel(key)}
-              />
-              {name}
-            </label>
-          ))}
-        </fieldset>
-
-        <div>
-          <fieldset className="filter-group">
-            <legend>Availability</legend>
-            <label className="filter-option">
-              <input
-                type="checkbox"
-                checked={draft.notTaken}
-                onChange={(event) => update({ notTaken: event.target.checked })}
-              />
-              Not taken yet
-            </label>
-            <label className="filter-option">
-              <input
-                type="checkbox"
-                checked={draft.noPullRequest}
-                onChange={(event) => update({ noPullRequest: event.target.checked })}
-              />
-              No pull request yet
-            </label>
-          </fieldset>
-          <fieldset className="filter-group">
-            <legend>Comments</legend>
-            {radios("comments", COMMENT_OPTIONS, draft.comments)}
-          </fieldset>
-        </div>
-
-        <fieldset className="filter-group">
-          <legend>Last updated</legend>
-          {radios("updated", UPDATED_OPTIONS, draft.updated)}
-        </fieldset>
-
-        <div className="filter-group">
+      {/* Top row: where to look. The dropdowns sit side by side. */}
+      <div className="filters-top">
+        <div className="filter-field">
           <label className="filter-label" htmlFor={languageId}>
             Language
           </label>
@@ -134,7 +90,9 @@ function FiltersPanel({ id, filters, onApply, onClose }) {
               </option>
             ))}
           </select>
+        </div>
 
+        <div className="filter-field">
           <label className="filter-label" htmlFor={projectId}>
             Project or organisation
           </label>
@@ -142,37 +100,20 @@ function FiltersPanel({ id, filters, onApply, onClose }) {
             id={projectId}
             className="filter-input"
             type="text"
-            placeholder="e.g. vercel or vercel/next.js"
+            placeholder="Any project, e.g. vercel/next.js"
             value={draft.project}
             aria-invalid={!projectValid}
-            aria-describedby={projectHintId}
+            aria-describedby={projectValid ? undefined : projectHintId}
             onChange={(event) => update({ project: event.target.value })}
           />
-          <p
-            id={projectHintId}
-            className={`filter-hint${projectValid ? "" : " filter-hint-error"}`}
-          >
-            {projectValid
-              ? "Leave empty to search every project."
-              : "Use a name like vercel or vercel/next.js."}
-          </p>
+          {!projectValid && (
+            <p id={projectHintId} className="filter-hint filter-hint-error">
+              Use a name like vercel or vercel/next.js.
+            </p>
+          )}
+        </div>
 
-          <label className="filter-option filter-popular">
-            <input
-              type="checkbox"
-              checked={draft.popular && !project}
-              disabled={Boolean(project)}
-              aria-describedby={popularHintId}
-              onChange={(event) => update({ popular: event.target.checked })}
-            />
-            Popular, active projects only
-          </label>
-          <p id={popularHintId} className="filter-hint">
-            {project
-              ? "Not used when a project is chosen above."
-              : "1,000+ stars and updated in the last month."}
-          </p>
-
+        <div className="filter-field">
           <label className="filter-label" htmlFor={sortId}>
             Sort by
           </label>
@@ -189,6 +130,71 @@ function FiltersPanel({ id, filters, onApply, onClose }) {
             ))}
           </select>
         </div>
+      </div>
+
+      <div className="filter-popular-row">
+        <label className="filter-option filter-popular">
+          <input
+            type="checkbox"
+            checked={draft.popular && !project}
+            disabled={Boolean(project)}
+            aria-describedby={popularHintId}
+            onChange={(event) => update({ popular: event.target.checked })}
+          />
+          Popular, active projects only
+        </label>
+        <p id={popularHintId} className="filter-hint">
+          {project
+            ? "Not used when a project is chosen above."
+            : "1,000+ stars and updated in the last month."}
+        </p>
+      </div>
+
+      {/* Bottom row: which issues. Four short groups of similar height. */}
+      <div className="filters-grid">
+        <fieldset className="filter-group">
+          <legend>Type of issue</legend>
+          {Object.entries(LABELS).map(([key, { name }]) => (
+            <label key={key} className="filter-option">
+              <input
+                type="checkbox"
+                checked={draft.labels.includes(key)}
+                onChange={() => toggleLabel(key)}
+              />
+              {name}
+            </label>
+          ))}
+        </fieldset>
+
+        <fieldset className="filter-group">
+          <legend>Availability</legend>
+          <label className="filter-option">
+            <input
+              type="checkbox"
+              checked={draft.notTaken}
+              onChange={(event) => update({ notTaken: event.target.checked })}
+            />
+            Not taken yet
+          </label>
+          <label className="filter-option">
+            <input
+              type="checkbox"
+              checked={draft.noPullRequest}
+              onChange={(event) => update({ noPullRequest: event.target.checked })}
+            />
+            No pull request yet
+          </label>
+        </fieldset>
+
+        <fieldset className="filter-group">
+          <legend>Comments</legend>
+          {radios("comments", COMMENT_OPTIONS, draft.comments)}
+        </fieldset>
+
+        <fieldset className="filter-group">
+          <legend>Last updated</legend>
+          {radios("updated", UPDATED_OPTIONS, draft.updated)}
+        </fieldset>
       </div>
 
       <div className="filters-panel-footer">
