@@ -3,6 +3,8 @@ import {
   DEFAULT_FILTERS,
   activeFilterChips,
   buildQuery,
+  popularReposPath,
+  reposInQuery,
   searchPath,
   stateFromUrl,
   stateToUrl,
@@ -124,5 +126,46 @@ describe("toIssue", () => {
       comments: 3,
       language: "Go",
     });
+  });
+});
+
+describe("popular, active projects", () => {
+  const repos = Array.from({ length: 30 }, (_, i) => `some-organisation/project-number-${i}`);
+
+  it("limits the search to as many projects as fit in GitHub's 256 characters", () => {
+    const filters = { ...DEFAULT_FILTERS, popular: true, language: "Python" };
+    const query = buildQuery(filters, "", repos);
+    expect(query.length).toBeLessThanOrEqual(256);
+    const included = reposInQuery(query, repos);
+    expect(included.length).toBeGreaterThan(0);
+    expect(included.length).toBeLessThan(repos.length);
+    expect(included).toEqual(repos.slice(0, included.length));
+  });
+
+  it("ignores the popular list when a project is chosen", () => {
+    const filters = { ...DEFAULT_FILTERS, popular: true, project: "vercel/next.js" };
+    expect(buildQuery(filters, "", repos)).not.toContain("some-organisation");
+    expect(activeFilterChips(filters).map((chip) => chip.label)).not.toContain(
+      "Popular projects only",
+    );
+  });
+
+  it("asks GitHub for well-known, recently active projects", () => {
+    const path = popularReposPath({ ...DEFAULT_FILTERS, language: "C++" });
+    const params = new URLSearchParams(path.split("?")[1]);
+    const query = params.get("q");
+    expect(query).toContain("stars:>=1000");
+    expect(query).toContain("good-first-issues:>=3");
+    expect(query).toMatch(/pushed:>=\d{4}-\d\d-\d\d/);
+    expect(query).toContain('language:"C++"');
+    expect(params.get("sort")).toBe("stars");
+  });
+
+  it("is kept in the address bar and shown as a chip", () => {
+    const filters = { ...DEFAULT_FILTERS, popular: true };
+    expect(stateFromUrl(stateToUrl(filters, "", 1)).filters.popular).toBe(true);
+    expect(activeFilterChips(filters).map((chip) => chip.label)).toContain(
+      "Popular projects only",
+    );
   });
 });

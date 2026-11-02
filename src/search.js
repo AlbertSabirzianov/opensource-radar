@@ -5,6 +5,13 @@ export const PER_PAGE = 10;
 // GitHub's search API returns at most 1,000 results for any query.
 export const MAX_RESULTS = 1000;
 const MAX_TEXT_LENGTH = 200;
+// GitHub rejects search queries longer than this.
+const MAX_QUERY_LENGTH = 256;
+// "Popular, active projects": well-known and recently worked on.
+const POPULAR_MIN_STARS = 1000;
+const POPULAR_ACTIVE_DAYS = 30;
+const POPULAR_MIN_BEGINNER_ISSUES = 3;
+const POPULAR_CANDIDATES = 30;
 
 export const LABELS = {
   "good-first-issue": { name: "Good first issue", labels: ["good first issue"] },
@@ -50,6 +57,7 @@ export const DEFAULT_FILTERS = {
   updated: "any",
   language: "",
   project: "",
+  popular: false,
   sort: "updated",
 };
 
@@ -95,7 +103,9 @@ const UPDATED_DAYS = { today: 0, week: 7, month: 30 };
 // Quotes values with spaces or symbols, e.g. "good first issue" or "C++".
 const quote = (value) => (/^[\w-]+$/.test(value) ? value : `"${value}"`);
 
-export function buildQuery(filters, text) {
+// `repos` (from "Popular, active projects only") limits the search to those
+// projects; as many are added as fit in GitHub's query length limit.
+export function buildQuery(filters, text, repos = []) {
   const parts = ["is:issue", "is:open", "archived:false"];
 
   // Several labels in one "label:" means "any of these".
@@ -120,12 +130,24 @@ export function buildQuery(filters, text) {
   const words = text.trim().slice(0, MAX_TEXT_LENGTH);
   if (words) parts.push(words);
 
-  return parts.join(" ");
+  // Several "repo:" in one query means "any of these projects".
+  let query = parts.join(" ");
+  for (const repo of filters.project ? [] : repos) {
+    const next = `${query} repo:${repo}`;
+    if (next.length > MAX_QUERY_LENGTH) break;
+    query = next;
+  }
+  return query;
 }
 
-export function searchPath(filters, text, page) {
+// Which of `repos` actually fit into the query (shown under the results).
+export function reposInQuery(query, repos) {
+  return repos.filter((repo) => query.includes(`repo:${repo}`));
+}
+
+export function searchPath(filters, text, page, repos = []) {
   const params = new URLSearchParams({
-    q: buildQuery(filters, text),
+    q: buildQuery(filters, text, repos),
     per_page: String(PER_PAGE),
     page: String(page),
   });
@@ -139,11 +161,36 @@ export function searchPath(filters, text, page) {
   return `/search/issues?${params}`;
 }
 
+// GitHub's issue search can't filter by stars, so "Popular, active projects
+// only" first finds such projects (a repository search), then searches
+// issues inside them.
+export function popularReposPath(filters) {
+  const parts = [
+    `stars:>=${POPULAR_MIN_STARS}`,
+    "archived:false",
+    `pushed:>=${isoDaysAgo(POPULAR_ACTIVE_DAYS)}`,
+  ];
+  if (filters.labels.includes("good-first-issue")) {
+    parts.push(`good-first-issues:>=${POPULAR_MIN_BEGINNER_ISSUES}`);
+  } else if (filters.labels.includes("help-wanted")) {
+    parts.push(`help-wanted-issues:>=${POPULAR_MIN_BEGINNER_ISSUES}`);
+  }
+  if (filters.language) parts.push(`language:${quote(filters.language)}`);
+
+  const params = new URLSearchParams({
+    q: parts.join(" "),
+    sort: "stars",
+    order: "desc",
+    per_page: String(POPULAR_CANDIDATES),
+  });
+  return `/search/repositories?${params}`;
+}
+
 // Address-bar format, e.g. ?labels=good-first-issue&available=1&lang=Python
 export function stateFromUrl(search) {
   const params = new URLSearchParams(search);
   const known = ["q", "labels", "available", "nopr", "comments", "updated",
-    "lang", "project", "sort", "page"];
+    "lang", "project", "popular", "sort", "page"];
   if (!known.some((key) => params.has(key))) {
     return { filters: DEFAULT_FILTERS, text: "", page: 1 };
   }
@@ -164,6 +211,7 @@ export function stateFromUrl(search) {
       updated: pick("updated", UPDATED_OPTIONS, "any"),
       language: LANGUAGES.includes(language) ? language : "",
       project: isValidProject(project) ? project : "",
+      popular: params.get("popular") === "1",
       sort: pick("sort", SORT_OPTIONS, "updated"),
     },
     text: (params.get("q") || "").slice(0, MAX_TEXT_LENGTH),
@@ -184,6 +232,7 @@ export function stateToUrl(filters, text, page) {
   if (filters.updated !== "any") params.set("updated", filters.updated);
   if (filters.language) params.set("lang", filters.language);
   if (filters.project) params.set("project", filters.project);
+  if (filters.popular) params.set("popular", "1");
   if (filters.sort !== "updated") params.set("sort", filters.sort);
   if (page > 1) params.set("page", String(page));
   return `?${params}`;
@@ -209,6 +258,7 @@ export function activeFilterChips(filters) {
   add(filters.updated !== "any", "updated", `Updated: ${UPDATED_OPTIONS[filters.updated]}`, { updated: "any" });
   add(Boolean(filters.language), "language", filters.language, { language: "" });
   add(Boolean(filters.project), "project", filters.project, { project: "" });
+  add(filters.popular && !filters.project, "popular", "Popular projects only", { popular: false });
 
   return chips;
 }

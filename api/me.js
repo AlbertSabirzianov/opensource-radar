@@ -10,6 +10,8 @@ export async function GET(request) {
   const features = {
     savedSync: config.configured && storeAvailable(),
     reportsAvailable: reportsAvailable(),
+    // Project details on cards for visitors who aren't signed in.
+    projectInfo: Boolean(process.env.GITHUB_READ_TOKEN),
   };
 
   if (!config.configured) {

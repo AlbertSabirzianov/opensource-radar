@@ -4,6 +4,7 @@ import { GET as callback } from "../api/auth/callback.js";
 import { GET as login } from "../api/auth/login.js";
 import { GET as me } from "../api/me.js";
 import { POST as report } from "../api/report.js";
+import { GET as repos } from "../api/repos.js";
 import { GET as getSaved, PUT as putSaved } from "../api/saved.js";
 import { seal, unseal } from "../api/_lib/session.js";
 
@@ -13,6 +14,7 @@ const REDIS_URL = "https://fake-redis.test";
 // A fake Upstash database and a fake GitHub issues API.
 let db;
 let issues;
+let graphqlCalls;
 
 function fakeFetch(url, init = {}) {
   url = String(url);
@@ -30,6 +32,29 @@ function fakeFetch(url, init = {}) {
       return Response.json({ result: count });
     }
     if (command === "EXPIRE") return Response.json({ result: 1 });
+    if (command === "MGET") {
+      const keys = JSON.parse(init.body).slice(1);
+      return Response.json({ result: keys.map((key) => db.get(key) ?? null) });
+    }
+  }
+
+  if (url === "https://api.github.com/graphql") {
+    const { variables } = JSON.parse(init.body);
+    graphqlCalls.push({ auth: init.headers.Authorization, variables });
+    const data = {};
+    for (const key of Object.keys(variables).filter((name) => name.startsWith("n"))) {
+      const index = key.slice(1);
+      data[`r${index}`] =
+        variables[key] === "missing"
+          ? null
+          : {
+              stargazerCount: 1234,
+              pushedAt: variables[key] === "old" ? "2020-01-01T00:00:00Z" : new Date().toISOString(),
+              isArchived: false,
+              contributingGuidelines: { url: `https://github.com/${variables[`o${index}`]}/${variables[key]}/blob/main/CONTRIBUTING.md` },
+            };
+    }
+    return Response.json({ data });
   }
 
   if (url.endsWith("/repos/opensource-radar/opensource-radar/issues")) {
@@ -64,6 +89,7 @@ async function sessionCookie() {
 beforeEach(() => {
   db = new Map();
   issues = [];
+  graphqlCalls = [];
   vi.stubEnv("GITHUB_CLIENT_ID", "test-client-id");
   vi.stubEnv("GITHUB_CLIENT_SECRET", "test-client-secret");
   vi.stubEnv("SESSION_SECRET", SESSION_SECRET);
@@ -242,5 +268,50 @@ describe("report form", () => {
     expect(
       (await send({ type: "other", message: "someone else" }, { "x-forwarded-for": "5.6.7.8" })).status,
     ).toBe(200);
+  });
+});
+
+describe("project details", () => {
+  const ask = (names, headers = {}) =>
+    repos(request(`/api/repos?names=${encodeURIComponent(names)}`, { headers: { "x-forwarded-for": "9.9.9.9", ...headers } }));
+
+  it("refuses bad project names", async () => {
+    expect((await ask("not a repo")).status).toBe(400);
+    expect((await ask("a/b/c")).status).toBe(400);
+    expect((await ask(Array.from({ length: 11 }, (_, i) => `a/r${i}`).join(","))).status).toBe(400);
+  });
+
+  it("is unavailable to visitors without a server token", async () => {
+    expect((await ask("a/b")).status).toBe(503);
+  });
+
+  it("uses the signed-in user's token and caches the answer for a day", async () => {
+    const cookie = await sessionCookie();
+    const data = await (await ask("vercel/next.js,someone/old,someone/missing", { cookie })).json();
+
+    expect(graphqlCalls).toHaveLength(1);
+    expect(graphqlCalls[0].auth).toBe("Bearer x");
+    expect(data.repos["vercel/next.js"]).toMatchObject({
+      stars: 1234,
+      archived: false,
+      quiet: false,
+      contributingUrl: "https://github.com/vercel/next.js/blob/main/CONTRIBUTING.md",
+    });
+    expect(data.repos["someone/old"].quiet).toBe(true);
+    expect(data.repos["someone/missing"]).toEqual({ missing: true });
+
+    await ask("vercel/next.js", { cookie });
+    expect(graphqlCalls).toHaveLength(1);
+  });
+
+  it("lets visitors use the server token, with a per-visitor limit", async () => {
+    vi.stubEnv("GITHUB_READ_TOKEN", "server-read-token");
+    const first = await ask("a/one");
+    expect(first.status).toBe(200);
+    expect(graphqlCalls[0].auth).toBe("Bearer server-read-token");
+
+    for (let i = 0; i < 29; i += 1) await ask("a/one");
+    expect((await ask("a/one")).status).toBe(429);
+    expect((await ask("a/one", { "x-forwarded-for": "8.8.8.8" })).status).toBe(200);
   });
 });

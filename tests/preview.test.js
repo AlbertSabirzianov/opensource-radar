@@ -22,6 +22,12 @@ describe("previewText", () => {
     );
   });
 
+  it("drops hidden HTML comments, even unfinished ones", () => {
+    expect(previewText("<!-- note for\nbots -->Real text <!-- cut off")).toBe(
+      "Real text",
+    );
+  });
+
   it("handles empty descriptions", () => {
     expect(previewText(null)).toBe("No description provided.");
   });
@@ -40,6 +46,7 @@ describe("previewText", () => {
     ["image openers", "![".repeat(32768)],
     ["angle brackets", "<".repeat(65536)],
     ["numbered lines", "1.\n".repeat(21845)],
+    ["comment openers", "<!--".repeat(16384)],
   ])("stays fast on hostile input: %s", (_, body) => {
     const start = performance.now();
     previewText(body);

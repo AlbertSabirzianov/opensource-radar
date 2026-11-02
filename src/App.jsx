@@ -13,6 +13,8 @@ import {
   SORT_OPTIONS,
   activeFilterChips,
   countActiveFilters,
+  popularReposPath,
+  reposInQuery,
   searchPath,
   stateFromUrl,
   stateToUrl,
@@ -38,6 +40,10 @@ const NO_FILTERS = {
 // Recent results, so paging back or repeating a search doesn't spend one of
 // GitHub's limited searches.
 const searchCache = new Map();
+// The "popular, active projects" found per language, reused for an hour.
+const popularCache = new Map();
+const POPULAR_CACHE_TIME = 60 * 60 * 1000;
+const QUIET_AFTER_DAYS = 180;
 
 // Saved issues live in this browser, one list per GitHub account, so two
 // people sharing a computer don't see each other's.
@@ -203,6 +209,7 @@ function App() {
     signInAvailable: false,
     savedSync: false,
     reportsAvailable: false,
+    projectInfo: false,
     checked: false,
   });
   // Bookmark changes are sent to the server one after another, so a quick
@@ -235,6 +242,7 @@ function App() {
           signInAvailable: Boolean(data?.signInAvailable),
           savedSync,
           reportsAvailable: Boolean(data?.reportsAvailable),
+          projectInfo: Boolean(data?.projectInfo),
           checked: true,
         });
         if (!user) return;
@@ -266,6 +274,9 @@ function App() {
   const [search, setSearch] = useState(() => stateFromUrl(window.location.search));
   const [inputText, setInputText] = useState(search.text);
   const [results, setResults] = useState({ status: "loading", items: [], total: 0 });
+  // Stars, activity and contributing guide per project ("owner/repo").
+  const [projects, setProjects] = useState({});
+  const requestedProjects = useRef(new Set());
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [projectsOpen, setProjectsOpen] = useState(false);
   const [recommendation, setRecommendation] = useState(null);
@@ -294,10 +305,70 @@ function App() {
     if (!account.checked || view === "saved") return undefined;
 
     let cancelled = false;
-    const language = search.filters.language;
+    const { filters } = search;
+    const language = filters.language;
+    const usePopular = filters.popular && !filters.project;
+    const cacheKey = usePopular ? `${path}&popular` : path;
+
+    // Handles the answers every GitHub search can give besides success.
+    // Returns true when it has dealt with the response.
+    const handleProblem = (response) => {
+      if (signedIn && response.status === 401) {
+        // Session expired: show the signed-out menu; this effect then
+        // runs the search again the anonymous way.
+        setAccount((current) => ({ ...current, user: null }));
+        return true;
+      }
+      if (response.status === 403 || response.status === 429) {
+        setResults({
+          status: "error",
+          items: [],
+          total: 0,
+          message: searchLimitMessage(response, signedIn, account.signInAvailable),
+        });
+        return true;
+      }
+      if (response.status === 422) {
+        setResults({
+          status: "error",
+          items: [],
+          total: 0,
+          message:
+            "GitHub couldn't understand this search. Check the words or a project name in Filters.",
+        });
+        return true;
+      }
+      if (!response.ok) throw new Error(`Search failed (${response.status})`);
+      return false;
+    };
+
+    // Popular, active projects for these filters (cached for an hour).
+    async function findPopularRepos() {
+      const reposPath = popularReposPath(filters);
+      const cached = popularCache.get(reposPath);
+      if (cached && Date.now() - cached.time < POPULAR_CACHE_TIME) {
+        return cached.value;
+      }
+
+      const response = await fetch(githubUrl(reposPath, signedIn));
+      if (cancelled || handleProblem(response)) return null;
+
+      const quietSince = Date.now() - QUIET_AFTER_DAYS * 24 * 60 * 60 * 1000;
+      const repos = ((await response.json()).items || []).map((repo) => ({
+        name: repo.full_name,
+        info: {
+          stars: repo.stargazers_count,
+          pushedAt: repo.pushed_at,
+          archived: repo.archived,
+          quiet: new Date(repo.pushed_at).getTime() < quietSince,
+        },
+      }));
+      popularCache.set(reposPath, { time: Date.now(), value: repos });
+      return repos;
+    }
 
     async function runSearch() {
-      const cached = searchCache.get(path);
+      const cached = searchCache.get(cacheKey);
       if (cached && Date.now() - cached.time < SEARCH_CACHE_TIME) {
         setResults({ status: "ready", ...cached.value });
         return;
@@ -305,35 +376,36 @@ function App() {
 
       setResults((current) => ({ ...current, status: "loading" }));
       try {
-        const response = await fetch(githubUrl(path, signedIn));
-        if (cancelled) return;
+        let issuesPath = path;
+        let popularRepos = [];
 
-        if (signedIn && response.status === 401) {
-          // Session expired: show the signed-out menu; this effect then
-          // runs the search again the anonymous way.
-          setAccount((current) => ({ ...current, user: null }));
-          return;
-        }
-        if (response.status === 403 || response.status === 429) {
-          setResults({
-            status: "error",
-            items: [],
-            total: 0,
-            message: searchLimitMessage(response, signedIn, account.signInAvailable),
+        if (usePopular) {
+          const repos = await findPopularRepos();
+          if (!repos || cancelled) return;
+          if (repos.length === 0) {
+            setResults({ status: "ready", items: [], total: 0, popularRepos: [] });
+            return;
+          }
+
+          // What the repository search already told us about each project.
+          setProjects((current) => {
+            const next = { ...current };
+            repos.forEach(({ name, info }) => {
+              next[name] = { ...info, ...current[name] };
+            });
+            return next;
           });
-          return;
+
+          const names = repos.map((repo) => repo.name);
+          issuesPath = searchPath(filters, search.text, search.page, names);
+          popularRepos = reposInQuery(
+            new URLSearchParams(issuesPath.split("?")[1]).get("q"),
+            names,
+          );
         }
-        if (response.status === 422) {
-          setResults({
-            status: "error",
-            items: [],
-            total: 0,
-            message:
-              "GitHub couldn't understand this search. Check the words or a project name in Filters.",
-          });
-          return;
-        }
-        if (!response.ok) throw new Error(`Search failed (${response.status})`);
+
+        const response = await fetch(githubUrl(issuesPath, signedIn));
+        if (cancelled || handleProblem(response)) return;
 
         const data = await response.json();
         if (cancelled) return;
@@ -341,8 +413,9 @@ function App() {
         const value = {
           items: (data.items || []).map((item) => toIssue(item, language)),
           total: data.total_count || 0,
+          popularRepos,
         };
-        searchCache.set(path, { time: Date.now(), value });
+        searchCache.set(cacheKey, { time: Date.now(), value });
         setResults({ status: "ready", ...value });
       } catch {
         if (!cancelled) {
@@ -361,7 +434,7 @@ function App() {
     return () => {
       cancelled = true;
     };
-  }, [path, account.checked, signedIn, view, search.filters.language, account.signInAvailable]);
+  }, [path, search, account.checked, signedIn, view, account.signInAvailable]);
 
   const scrollToResults = () =>
     document
@@ -513,6 +586,37 @@ function App() {
   const totalPages = view === "saved" ? savedPages : searchPages;
   const setPage = view === "saved" ? setSavedPage : goToPage;
 
+  // Project details for the cards on screen. Signed-in users use their own
+  // GitHub limit; visitors only get them when the server has a read token.
+  const shownRepos = [
+    ...new Set(shownIssues.map((issue) => issue.repo.replace(" / ", "/"))),
+  ].join(",");
+  const canLoadProjects = signedIn || account.projectInfo;
+
+  useEffect(() => {
+    if (!canLoadProjects || !shownRepos) return;
+
+    const names = shownRepos
+      .split(",")
+      .filter((name) => !requestedProjects.current.has(name));
+    if (names.length === 0) return;
+    names.forEach((name) => requestedProjects.current.add(name));
+
+    fetch(`/api/repos?names=${encodeURIComponent(names.join(","))}`)
+      .then((response) => (response.ok ? response.json() : null))
+      .then((data) => {
+        if (data?.repos) setProjects((current) => ({ ...current, ...data.repos }));
+        else names.forEach((name) => requestedProjects.current.delete(name));
+      })
+      .catch(() => names.forEach((name) => requestedProjects.current.delete(name)));
+  }, [shownRepos, canLoadProjects]);
+
+  const popularRepos = results.popularRepos || [];
+  const popularNote =
+    popularRepos.length > 3
+      ? `${popularRepos.slice(0, 3).join(", ")} and ${popularRepos.length - 3} more`
+      : popularRepos.join(", ");
+
   let listMessage = "";
   if (view === "saved" && savedIssues.length === 0) {
     listMessage =
@@ -521,6 +625,15 @@ function App() {
     listMessage = "Searching GitHub...";
   } else if (view === "search" && results.status === "error") {
     listMessage = results.message;
+  } else if (
+    view === "search" &&
+    search.filters.popular &&
+    !search.filters.project &&
+    popularRepos.length === 0
+  ) {
+    listMessage = `No popular, active projects found${
+      search.filters.language ? ` for ${search.filters.language}` : ""
+    }. Try another language, or remove "Popular projects only".`;
   } else if (view === "search" && results.items.length === 0) {
     listMessage = "No issues match this search. Try removing a filter above.";
   }
@@ -652,6 +765,10 @@ function App() {
               )}
             </div>
 
+            {popularRepos.length > 0 && results.status === "ready" && (
+              <p className="view-note">From popular, active projects: {popularNote}.</p>
+            )}
+
             {recommendation && (
               <p className="view-note">
                 {recommendation.error
@@ -711,6 +828,7 @@ function App() {
                 updatedAt={issue.updatedAt}
                 saved={savedIds.has(issue.id)}
                 onToggleSave={signedIn ? () => toggleSaved(issue) : undefined}
+                project={projects[issue.repo.replace(" / ", "/")]}
               />
             ))
           )}
