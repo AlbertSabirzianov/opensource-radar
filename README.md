@@ -11,7 +11,8 @@ OpenSource Radar helps developers find open issues they can contribute to, acros
 - 🔍 **Search all of GitHub** — live search over open issues in every public repository
 - 🌱 **Beginner friendly by default** — starts with `good first issue` issues that nobody has taken yet
 - 💡 **Suggestions while you type** — matching languages and projects, plus quick starting points: good first issues nobody has taken, updated today, docs and small fixes, and projects that welcome beginners
-- 🎛️ **Filters** — type of issue, not taken yet, no pull request yet, comments, last updated, language, project or organisation, and sort order
+- 🎛️ **Filters** — type of issue, not taken yet, no pull request yet, comments, last updated, language, project or organisation, popular and active projects only, and sort order
+- ⭐ **Project details on cards** — stars, a warning for archived or quiet projects, and a link to the contributing guide
 - 🔗 **Shareable searches** — the search lives in the address bar, so a link opens exactly the same results
 - 🔐 **Sign in with GitHub** — higher search limits, plus:
   - 🔖 **Saved issues**, synced across your devices
@@ -73,6 +74,7 @@ That's all you need for searching. Sign-in, saved-issue sync and the report form
 
 - **Sync across devices** needs an [Upstash Redis](https://upstash.com/) database. Add its REST URL and token as `KV_REST_API_URL` and `KV_REST_API_TOKEN`.
 - **The report form** needs a fine-grained GitHub token limited to your repository, with only **Issues: Read and write**. Add it as `REPORT_GITHUB_TOKEN`.
+- **Project details on cards** (stars, activity, contributing guide) work for signed-in users automatically. To show them to visitors too, add a fine-grained token with **Public repositories (read-only)** access and no permissions as `GITHUB_READ_TOKEN`.
 
 ### Settings
 
@@ -84,6 +86,7 @@ That's all you need for searching. Sign-in, saved-issue sync and the report form
 | `KV_REST_API_URL`, `KV_REST_API_TOKEN` | Saved-issue sync, report limits | Upstash Redis (Vercel adds these automatically) |
 | `REPORT_GITHUB_TOKEN` | Report form | Fine-grained GitHub token (Issues only) |
 | `REPORT_REPO` | Report form (optional) | Defaults to `opensource-radar/opensource-radar` |
+| `GITHUB_READ_TOKEN` | Project details for visitors (optional) | Fine-grained GitHub token with public read-only access, no permissions |
 
 ### Scripts
 
@@ -132,7 +135,7 @@ opensource-radar/
 - [x] Recommendations and contributions for signed-in users
 - [x] In-site report form
 - [ ] Logo and sharing preview image
-- [ ] Project details on issue cards (stars, last activity)
+- [x] Project details on issue cards and a popular-projects filter
 - [ ] Saved searches
 
 ## 🤝 Contributing
