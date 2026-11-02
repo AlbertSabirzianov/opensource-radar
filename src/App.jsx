@@ -1,37 +1,43 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
+import FiltersPanel from "./components/FiltersPanel";
 import Icon from "./components/Icon";
 import IssueCard from "./components/IssueCard";
 import NavMenu from "./components/NavMenu";
+import ProjectsDialog from "./components/ProjectsDialog";
+import SearchBar from "./components/SearchBar";
 import { githubUrl } from "./github";
+import {
+  DEFAULT_FILTERS,
+  MAX_RESULTS,
+  PER_PAGE,
+  SORT_OPTIONS,
+  activeFilterChips,
+  countActiveFilters,
+  searchPath,
+  stateFromUrl,
+  stateToUrl,
+  toIssue,
+} from "./search";
 import "./App.css";
 
-const CACHE_KEY = "opensource-radar-issues-v11";
 const THEME_KEY = "opensource-radar-theme";
-const CACHE_DURATION = 10 * 60 * 1000;
-const ISSUES_PER_PAGE = 10;
-const BEGINNER_LABELS = ["good first issue", "help wanted"];
-const REPOSITORIES = {
-  "facebook/react": "JavaScript",
-  "vuejs/core": "TypeScript",
-  "pallets/flask": "Python",
-  "spring-projects/spring-boot": "Java",
-};
-
-const normalizeLabel = (label) =>
-  String(label || "")
-    .trim()
-    .toLowerCase();
-
-const isBeginnerFriendly = (issue) =>
-  (issue.labels || []).some((label) =>
-    BEGINNER_LABELS.includes(normalizeLabel(label)),
-  );
-
+// Issues used to be cached here before search covered all of GitHub.
+const OLD_ISSUES_CACHE_KEY = "opensource-radar-issues-v11";
 const DARK_SCHEME_QUERY = "(prefers-color-scheme: dark)";
 const SAVED_KEY_PREFIX = "opensource-radar-saved-";
+const SYNCED_KEY_PREFIX = "opensource-radar-saved-synced-";
 const SAVED_DESCRIPTION_LENGTH = 1000;
 const RECOMMENDED_LANGUAGE_COUNT = 5;
-const EMPTY_RECOMMENDATION = { status: "idle", languages: [] };
+const SEARCH_CACHE_TIME = 5 * 60 * 1000;
+const NO_FILTERS = {
+  ...DEFAULT_FILTERS,
+  labels: [],
+  notTaken: false,
+};
+
+// Recent results, so paging back or repeating a search doesn't spend one of
+// GitHub's limited searches.
+const searchCache = new Map();
 
 // Saved issues live in this browser, one list per GitHub account, so two
 // people sharing a computer don't see each other's.
@@ -51,8 +57,6 @@ function writeSavedIssues(login, savedIssues) {
     // Storage full or blocked; the list still works until the page reloads.
   }
 }
-
-const SYNCED_KEY_PREFIX = "opensource-radar-saved-synced-";
 
 async function requestSaved(init) {
   const response = await fetch("/api/saved", init);
@@ -142,53 +146,20 @@ function getInitialThemePreference() {
   return "system";
 }
 
-async function fetchGitHubIssues(path, repo, signedIn) {
-  const response = await fetch(githubUrl(path, signedIn));
+function searchLimitMessage(response, signedIn, signInAvailable) {
+  const reset = Number(response.headers.get("x-ratelimit-reset"));
+  const seconds = reset ? Math.max(1, Math.ceil(reset - Date.now() / 1000)) : 0;
+  const wait = seconds ? `Try again in ${seconds} seconds` : "Try again in a minute";
 
-  if (!response.ok) {
-    if (signedIn && response.status === 401) {
-      const error = new Error("Your GitHub sign-in has expired.");
-      error.isSignedOut = true;
-      throw error;
-    }
-
-    if (response.status === 403 || response.status === 429) {
-      const reset = Number(response.headers.get("x-ratelimit-reset"));
-      const retryAt = reset
-        ? ` Try again after ${new Date(reset * 1000).toLocaleTimeString([], {
-            hour: "numeric",
-            minute: "2-digit",
-          })}.`
-        : " Please wait before refreshing.";
-      const error = new Error(`GitHub API rate limit reached.${retryAt}`);
-      error.isRateLimit = true;
-      throw error;
-    }
-
-    throw new Error(`GitHub request failed for ${repo} (${response.status}).`);
+  if (signedIn) {
+    return `GitHub allows 30 searches a minute. ${wait}.`;
   }
-
-  const data = await response.json();
-
-  if (!Array.isArray(data)) {
-    throw new Error(`Unexpected GitHub response for ${repo}.`);
-  }
-
-  return data;
+  return `GitHub allows 10 searches a minute without signing in. ${wait}${
+    signInAvailable ? ", or sign in from the menu for more" : ""
+  }.`;
 }
 
 function App() {
-  const [searchQuery, setSearchQuery] = useState("");
-  const [languageFilter, setLanguageFilter] = useState("All");
-  const [sortBy, setSortBy] = useState("updated");
-  const [beginnerOnly, setBeginnerOnly] = useState(false);
-  const [issues, setIssues] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-  const [notice, setNotice] = useState("");
-  const [refreshKey, setRefreshKey] = useState(0);
-  const [currentPage, setCurrentPage] = useState(1);
-  const [lastUpdated, setLastUpdated] = useState(null);
   const [themePreference, setThemePreference] = useState(
     getInitialThemePreference,
   );
@@ -225,8 +196,6 @@ function App() {
     }
   };
 
-  const refreshIssues = () => setRefreshKey((key) => key + 1);
-
   // Who's signed in, from the server (api/me.js). If the sign-in functions
   // aren't deployed or configured, the menu simply hides "Sign in".
   const [account, setAccount] = useState({
@@ -242,13 +211,17 @@ function App() {
   const [signInFailed] = useState(
     () => new URLSearchParams(window.location.search).get("signin") === "failed",
   );
-  // "all", "saved" or "recommended": which issues the list shows.
-  const [view, setView] = useState("all");
   const [savedIssues, setSavedIssues] = useState([]);
-  const [recommendation, setRecommendation] = useState(EMPTY_RECOMMENDATION);
+  const signedIn = Boolean(account.user);
 
   useEffect(() => {
     let cancelled = false;
+
+    try {
+      localStorage.removeItem(OLD_ISSUES_CACHE_KEY);
+    } catch {
+      // Nothing to clean up.
+    }
 
     fetch("/api/me", { headers: { Accept: "application/json" } })
       .then((response) => (response.ok ? response.json() : null))
@@ -288,11 +261,151 @@ function App() {
     };
   }, []);
 
-  const showIssues = (nextView) => {
-    setView(nextView);
+  // The search that's on screen: filters, words and page. It starts from
+  // the address bar, so a shared link opens the same search.
+  const [search, setSearch] = useState(() => stateFromUrl(window.location.search));
+  const [inputText, setInputText] = useState(search.text);
+  const [results, setResults] = useState({ status: "loading", items: [], total: 0 });
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [projectsOpen, setProjectsOpen] = useState(false);
+  const [recommendation, setRecommendation] = useState(null);
+  // "search" or "saved": which list is shown.
+  const [view, setView] = useState("search");
+  const [savedPage, setSavedPage] = useState(1);
+  const filtersPanelId = useId();
+  const filtersButtonFocus = () =>
+    document.querySelector(".filters-button")?.focus();
+
+  const path = searchPath(search.filters, search.text, search.page);
+
+  // Keep the address bar in step with the search (this also drops the
+  // one-off "?signin=failed" once it has been read).
+  useEffect(() => {
+    window.history.replaceState(
+      null,
+      "",
+      stateToUrl(search.filters, search.text, search.page),
+    );
+  }, [search]);
+
+  useEffect(() => {
+    // Wait until we know whether the visitor is signed in, so the search
+    // goes through the right route (and their own limit) the first time.
+    if (!account.checked || view === "saved") return undefined;
+
+    let cancelled = false;
+    const language = search.filters.language;
+
+    async function runSearch() {
+      const cached = searchCache.get(path);
+      if (cached && Date.now() - cached.time < SEARCH_CACHE_TIME) {
+        setResults({ status: "ready", ...cached.value });
+        return;
+      }
+
+      setResults((current) => ({ ...current, status: "loading" }));
+      try {
+        const response = await fetch(githubUrl(path, signedIn));
+        if (cancelled) return;
+
+        if (signedIn && response.status === 401) {
+          // Session expired: show the signed-out menu; this effect then
+          // runs the search again the anonymous way.
+          setAccount((current) => ({ ...current, user: null }));
+          return;
+        }
+        if (response.status === 403 || response.status === 429) {
+          setResults({
+            status: "error",
+            items: [],
+            total: 0,
+            message: searchLimitMessage(response, signedIn, account.signInAvailable),
+          });
+          return;
+        }
+        if (response.status === 422) {
+          setResults({
+            status: "error",
+            items: [],
+            total: 0,
+            message:
+              "GitHub couldn't understand this search. Check the words or a project name in Filters.",
+          });
+          return;
+        }
+        if (!response.ok) throw new Error(`Search failed (${response.status})`);
+
+        const data = await response.json();
+        if (cancelled) return;
+
+        const value = {
+          items: (data.items || []).map((item) => toIssue(item, language)),
+          total: data.total_count || 0,
+        };
+        searchCache.set(path, { time: Date.now(), value });
+        setResults({ status: "ready", ...value });
+      } catch {
+        if (!cancelled) {
+          setResults({
+            status: "error",
+            items: [],
+            total: 0,
+            message: "Couldn't reach GitHub. Check your connection and try again.",
+          });
+        }
+      }
+    }
+
+    runSearch();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [path, account.checked, signedIn, view, search.filters.language, account.signInAvailable]);
+
+  const scrollToResults = () =>
     document
       .querySelector(".issues-section")
       ?.scrollIntoView({ behavior: "smooth", block: "start" });
+
+  const runNewSearch = (changes) => {
+    setSearch((current) => ({ ...current, ...changes, page: 1 }));
+    setView("search");
+    setFiltersOpen(false);
+  };
+
+  const applyFilters = (filters) => {
+    setRecommendation(null);
+    runNewSearch({ filters });
+  };
+
+  const submitText = (text) => {
+    const words = text.trim();
+    setInputText(words);
+    runNewSearch({ text: words });
+  };
+
+  const pickFromSuggestions = (filterChanges) => {
+    setInputText("");
+    setRecommendation(null);
+    runNewSearch({
+      text: "",
+      filters: { ...search.filters, ...filterChanges },
+    });
+  };
+
+  const applyPreset = (preset) =>
+    pickFromSuggestions({
+      ...NO_FILTERS,
+      ...preset.filters,
+      language: search.filters.language,
+      project: search.filters.project,
+      sort: search.filters.sort,
+    });
+
+  const goToPage = (page) => {
+    setSearch((current) => ({ ...current, page }));
+    scrollToResults();
   };
 
   const toggleSaved = (issue) => {
@@ -313,35 +426,43 @@ function App() {
     }
   };
 
-  const showRecommended = async () => {
-    showIssues("recommended");
-    if (recommendation.status === "ready" || recommendation.status === "loading") {
-      return;
-    }
+  const showSaved = () => {
+    setView("saved");
+    setSavedPage(1);
+    scrollToResults();
+  };
 
-    setRecommendation({ ...EMPTY_RECOMMENDATION, status: "loading" });
+  // Beginner issues in the language the user codes in most (from their
+  // public repositories), with their other languages one click away.
+  const showRecommended = async () => {
     try {
       const response = await fetch(
         githubUrl("/user/repos?per_page=100&sort=pushed&affiliation=owner", true),
       );
       if (!response.ok) throw new Error("Couldn't read your repositories.");
 
-      setRecommendation({
-        status: "ready",
-        languages: topLanguages(await response.json()),
-      });
+      const languages = topLanguages(await response.json());
+      setRecommendation({ languages });
+      if (languages.length > 0) {
+        setInputText("");
+        runNewSearch({
+          text: "",
+          filters: {
+            ...NO_FILTERS,
+            labels: ["good-first-issue", "help-wanted"],
+            notTaken: true,
+            language: languages[0],
+          },
+        });
+      } else {
+        setView("search");
+      }
     } catch {
-      setRecommendation({ ...EMPTY_RECOMMENDATION, status: "error" });
+      setRecommendation({ languages: [], error: true });
+      setView("search");
     }
+    scrollToResults();
   };
-
-  useEffect(() => {
-    if (!signInFailed) return;
-
-    const url = new URL(window.location.href);
-    url.searchParams.delete("signin");
-    window.history.replaceState(null, "", url);
-  }, [signInFailed]);
 
   const signOut = async () => {
     try {
@@ -351,266 +472,35 @@ function App() {
     }
     setAccount((current) => ({ ...current, user: null }));
     setSavedIssues([]);
-    setRecommendation(EMPTY_RECOMMENDATION);
-    setView("all");
+    setRecommendation(null);
+    setView("search");
   };
 
-  const signedIn = Boolean(account.user);
-
-  useEffect(() => {
-    // Wait until we know whether the visitor is signed in, so issues load
-    // once, through the right route.
-    if (!account.checked) return undefined;
-
-    let cancelled = false;
-
-    async function loadIssues() {
-      setLoading(true);
-      let cachedData = null;
-      let cachedTimestamp = null;
-      setError("");
-      setNotice("");
-
-      try {
-        // Always read the cache so it can serve as a fallback if GitHub
-        // fails; only use it directly on a normal load (not a refresh).
-        try {
-          const cached = localStorage.getItem(CACHE_KEY);
-
-          if (cached) {
-            const parsedCache = JSON.parse(cached);
-            const { timestamp, data } = parsedCache;
-            if (Array.isArray(data)) {
-              cachedData = data;
-              cachedTimestamp = timestamp;
-            }
-
-            if (
-              refreshKey === 0 &&
-              Date.now() - timestamp < CACHE_DURATION &&
-              Array.isArray(data)
-            ) {
-              if (!cancelled) {
-                setIssues(data);
-                setLastUpdated(timestamp);
-                setLoading(false);
-              }
-              return;
-            }
-          }
-        } catch {
-          localStorage.removeItem(CACHE_KEY);
-        }
-
-        const repoResults = await Promise.allSettled(
-          Object.entries(REPOSITORIES).map(async ([repo, language]) => {
-            const basePath = `/repos/${repo}/issues`;
-            const commonParams =
-              "state=open&sort=updated&direction=desc&per_page=100";
-
-            const paths = [
-              `${basePath}?${commonParams}`,
-              ...BEGINNER_LABELS.map(
-                (label) =>
-                  `${basePath}?${commonParams}&labels=${encodeURIComponent(label)}`,
-              ),
-            ];
-
-            const responses = await Promise.all(
-              paths.map((path) => fetchGitHubIssues(path, repo, signedIn)),
-            );
-
-            const uniqueIssues = new Map();
-
-            responses.flat().forEach((issue) => {
-              if (!issue.pull_request) {
-                uniqueIssues.set(issue.id, issue);
-              }
-            });
-
-            return [...uniqueIssues.values()].map((issue) => {
-              const labels = (issue.labels || []).map((label) =>
-                typeof label === "string" ? label : label.name || "",
-              );
-
-              return {
-                id: issue.id,
-                updatedAt: issue.updated_at,
-                title: issue.title || "Untitled issue",
-                description: issue.body || "No description provided.",
-                labels,
-                label: labels.filter(Boolean).join(", ") || "Unlabeled",
-                language,
-                repo: repo.replace("/", " / "),
-                url: issue.html_url,
-              };
-            });
-          }),
-        );
-
-        const data = repoResults.flatMap((result) =>
-          result.status === "fulfilled" ? result.value : [],
-        );
-
-        if (
-          data.length === 0 &&
-          repoResults.some((result) => result.status === "rejected")
-        ) {
-          const rejectedWith = (flag) =>
-            repoResults.find(
-              (result) => result.status === "rejected" && result.reason?.[flag],
-            )?.reason;
-
-          throw (
-            rejectedWith("isSignedOut") ||
-            rejectedWith("isRateLimit") ||
-            new Error(
-              "Unable to load issues from GitHub. Please wait and try again.",
-            )
-          );
-        }
-
-        if (cancelled) return;
-
-        const fetchedAt = Date.now();
-        setIssues(data);
-        setLastUpdated(fetchedAt);
-
-        try {
-          localStorage.setItem(
-            CACHE_KEY,
-            JSON.stringify({ timestamp: fetchedAt, data }),
-          );
-        } catch {
-          localStorage.removeItem(CACHE_KEY);
-        }
-      } catch (err) {
-        if (cancelled) return;
-
-        if (err.isSignedOut) {
-          // Session expired: show the signed-out menu; this effect then
-          // reloads the issues the anonymous way.
-          setAccount((current) => ({ ...current, user: null }));
-          return;
-        }
-
-        if (cachedData && cachedData.length > 0) {
-          setIssues(cachedData);
-          setLastUpdated(cachedTimestamp);
-          setError("");
-          setNotice(
-            `${err.message || "Unable to load issues from GitHub."} Showing saved issues for now.`,
-          );
-        } else {
-          setError(err.message || "Unable to load issues from GitHub.");
-        }
-      } finally {
-        if (!cancelled) {
-          setLoading(false);
-        }
-      }
-    }
-
-    loadIssues();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [refreshKey, account.checked, signedIn]);
-
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [searchQuery, languageFilter, sortBy, beginnerOnly, refreshKey, view]);
-
-  const languages = [
-    "All",
-    ...new Set(issues.map((issue) => issue.language).filter(Boolean)),
-  ];
-
-  const query = searchQuery.trim().toLowerCase();
-  console.log("Search:", searchQuery);
-  console.log("Language:", languageFilter);
-  console.log("Beginner only:", beginnerOnly);
   const savedIds = new Set(savedIssues.map((issue) => issue.id));
-  const viewIssues =
-    view === "saved"
-      ? savedIssues
-      : view === "recommended"
-        ? issues.filter((issue) =>
-            recommendation.languages.includes(issue.language),
-          )
-        : issues;
-
-  const filteredIssues = viewIssues.filter((issue) => {
-    const labels = (issue.labels || []).join(" ").toLowerCase();
-    const matchesSearch =
-      issue.title.toLowerCase().includes(query) ||
-      issue.description.toLowerCase().includes(query) ||
-      issue.repo.toLowerCase().includes(query) ||
-      issue.language.toLowerCase().includes(query) ||
-      labels.includes(query);
-
-    const matchesLanguage =
-      languageFilter === "All" || issue.language === languageFilter;
-
-    const matchesBeginner = !beginnerOnly || isBeginnerFriendly(issue);
-
-    return matchesSearch && matchesLanguage && matchesBeginner;
-  });
-
-  const sortedIssues = [...filteredIssues].sort((a, b) => {
-    // Recommendations put beginner-friendly issues first.
-    if (view === "recommended") {
-      const beginnerFirst = isBeginnerFriendly(b) - isBeginnerFriendly(a);
-      if (beginnerFirst !== 0) return beginnerFirst;
-    }
-
-    if (sortBy === "title") {
-      return a.title.localeCompare(b.title);
-    }
-
-    if (sortBy === "repo") {
-      return a.repo.localeCompare(b.repo);
-    }
-
-    return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
-  });
-
-  const totalPages = Math.ceil(sortedIssues.length / ISSUES_PER_PAGE);
-  const startIndex = (currentPage - 1) * ISSUES_PER_PAGE;
-  const currentIssues = sortedIssues.slice(
-    startIndex,
-    startIndex + ISSUES_PER_PAGE,
+  const chips = activeFilterChips(search.filters);
+  const searchPages = Math.min(
+    Math.ceil(results.total / PER_PAGE),
+    MAX_RESULTS / PER_PAGE,
   );
-  console.log("Total issues:", issues.length);
-  console.log("Filtered issues:", filteredIssues.length);
-  console.log("Sorted issues:", sortedIssues.length);
-  console.log("Current page issues:", currentIssues.length);
-
-  const heading =
+  const savedPages = Math.ceil(savedIssues.length / PER_PAGE);
+  const shownIssues =
     view === "saved"
-      ? "Saved issues"
-      : view === "recommended"
-        ? "Recommended for you"
-        : beginnerOnly
-          ? "Explore beginner-friendly issues"
-          : "Explore open-source issues";
+      ? savedIssues.slice((savedPage - 1) * PER_PAGE, savedPage * PER_PAGE)
+      : results.items;
+  const page = view === "saved" ? savedPage : search.page;
+  const totalPages = view === "saved" ? savedPages : searchPages;
+  const setPage = view === "saved" ? setSavedPage : goToPage;
 
-  let emptyMessage = error || "No issues found. Try changing your filters.";
+  let listMessage = "";
   if (view === "saved" && savedIssues.length === 0) {
-    emptyMessage =
+    listMessage =
       "You haven't saved any issues yet. Use the bookmark on an issue to save it here.";
-  } else if (view === "recommended") {
-    if (recommendation.status === "loading") {
-      emptyMessage = "Looking at the languages in your repositories...";
-    } else if (recommendation.status === "error") {
-      emptyMessage = "Couldn't read your repositories. Try again in a moment.";
-    } else if (recommendation.languages.length === 0) {
-      emptyMessage =
-        "Your public repositories don't show a language yet, so there's nothing to match.";
-    } else if (viewIssues.length === 0) {
-      emptyMessage = `None of the tracked repositories use ${recommendation.languages.join(", ")} yet.`;
-    }
+  } else if (view === "search" && results.status === "loading") {
+    listMessage = "Searching GitHub...";
+  } else if (view === "search" && results.status === "error") {
+    listMessage = results.message;
+  } else if (view === "search" && results.items.length === 0) {
+    listMessage = "No issues match this search. Try removing a filter above.";
   }
 
   return (
@@ -621,15 +511,11 @@ function App() {
           <NavMenu
             themePreference={themePreference}
             onThemeChange={changeThemePreference}
-            onRefresh={refreshIssues}
-            loading={loading}
-            lastUpdated={lastUpdated}
-            repositories={Object.keys(REPOSITORIES)}
             user={account.user}
             signInAvailable={account.signInAvailable}
             onSignOut={signOut}
             savedCount={savedIssues.length}
-            onShowSaved={() => showIssues("saved")}
+            onShowSaved={showSaved}
             onShowRecommended={showRecommended}
             reportsAvailable={account.reportsAvailable}
             theme={theme}
@@ -640,156 +526,155 @@ function App() {
       <section className="hero">
         <p className="eyebrow">YOUR OPEN-SOURCE JOURNEY STARTS HERE</p>
         <h1>Find your first open-source issue.</h1>
-        <p className="description">
-          Discover beginner-friendly GitHub issues and take your first step
-          toward contributing to open source.
-        </p>
+        <p className="description">Search open issues across all of GitHub.</p>
 
-        <div className="search">
-          <form
-            className="search-field"
-            role="search"
-            onSubmit={(event) => {
-              event.preventDefault();
-              setSearchQuery(searchQuery.trim());
+        <SearchBar
+          text={inputText}
+          onTextChange={setInputText}
+          onSubmit={submitText}
+          onPickLanguage={(language) => pickFromSuggestions({ language })}
+          onPickProject={(project) => pickFromSuggestions({ project })}
+          onPreset={applyPreset}
+          onShowProjects={() => setProjectsOpen(true)}
+          filtersCount={countActiveFilters(search.filters)}
+          filtersOpen={filtersOpen}
+          filtersPanelId={filtersPanelId}
+          onToggleFilters={() => setFiltersOpen((open) => !open)}
+        />
+
+        {filtersOpen && (
+          <FiltersPanel
+            id={filtersPanelId}
+            filters={search.filters}
+            onApply={(filters) => {
+              applyFilters(filters);
+              filtersButtonFocus();
             }}
-          >
-            <svg
-              className="search-icon"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              aria-hidden="true"
-            >
-              <circle cx="11" cy="11" r="7" />
-              <path d="m20 20-3.5-3.5" />
-            </svg>
-            <input
-              id="issue-search"
-              name="issue-search"
-              type="text"
-              placeholder="Search issues, repositories, or technologies..."
-              aria-label="Search issues"
-              value={searchQuery}
-              onChange={(event) => setSearchQuery(event.target.value)}
-            />
-          </form>
-
-          <div className="search-filters">
-            <div
-              className="filter-chips"
-              role="group"
-              aria-label="Filter by programming language"
-            >
-              {languages.map((language) => (
-                <button
-                  key={language}
-                  type="button"
-                  className={`chip${languageFilter === language ? " chip-active" : ""}`}
-                  aria-pressed={languageFilter === language}
-                  onClick={() => setLanguageFilter(language)}
-                >
-                  {language === "All" ? "All" : language}
-                </button>
-              ))}
-
-              <label
-                className={`chip beginner-filter${beginnerOnly ? " chip-active" : ""}`}
-              >
-                <input
-                  id="beginner-only"
-                  name="beginner-only"
-                  type="checkbox"
-                  checked={beginnerOnly}
-                  onChange={(event) => setBeginnerOnly(event.target.checked)}
-                />
-                Beginner-friendly
-              </label>
-            </div>
-
-            <div className="search-actions">
-              <select
-                id="sort-by"
-                name="sort-by"
-                aria-label="Sort issues"
-                value={sortBy}
-                onChange={(event) => setSortBy(event.target.value)}
-              >
-                <option value="updated">Recently updated</option>
-                <option value="title">Title (A–Z)</option>
-                <option value="repo">Repository (A–Z)</option>
-              </select>
-
-              <button
-                type="button"
-                className="refresh-button"
-                onClick={refreshIssues}
-                disabled={loading}
-              >
-                {loading ? "Loading..." : "↻ Refresh"}
-              </button>
-            </div>
-          </div>
-        </div>
-
-        <p className="note">
-          Built for curious developers and first-time contributors.
-        </p>
+            onClose={() => {
+              setFiltersOpen(false);
+              filtersButtonFocus();
+            }}
+          />
+        )}
       </section>
 
-      <section className="issues-section">
-        <div className="issues-header">
-          <h2>{heading}</h2>
-          {view !== "all" && (
-            <button
-              type="button"
-              className="back-button"
-              onClick={() => setView("all")}
-            >
-              <Icon name="arrowLeft" />
-              All issues
-            </button>
-          )}
-        </div>
+      <section className="issues-section" aria-live="polite">
+        {view === "saved" ? (
+          <>
+            <div className="issues-header">
+              <h2>Saved issues</h2>
+              <button
+                type="button"
+                className="back-button"
+                onClick={() => setView("search")}
+              >
+                <Icon name="arrowLeft" />
+                Back to search
+              </button>
+            </div>
+            {savedIssues.length > 0 && (
+              <p className="view-note">
+                {account.savedSync
+                  ? `Synced to @${account.user?.login} on every device you sign in on.`
+                  : `Saved in this browser for @${account.user?.login}.`}
+              </p>
+            )}
+          </>
+        ) : (
+          <>
+            <h2 className="sr-only">Search results</h2>
+            <div className="results-bar">
+              <div className="active-filters">
+                {search.text && (
+                  <button
+                    type="button"
+                    className="filter-chip"
+                    aria-label={`Remove search words: ${search.text}`}
+                    onClick={() => submitText("")}
+                  >
+                    &ldquo;{search.text}&rdquo; <span aria-hidden="true">×</span>
+                  </button>
+                )}
+                {chips.map((chip) => (
+                  <button
+                    key={chip.key}
+                    type="button"
+                    className="filter-chip"
+                    aria-label={`Remove filter: ${chip.label}`}
+                    onClick={() => applyFilters(chip.remove(search.filters))}
+                  >
+                    {chip.label} <span aria-hidden="true">×</span>
+                  </button>
+                ))}
+                {(chips.length > 0 || search.text) && (
+                  <button
+                    type="button"
+                    className="text-button"
+                    onClick={() => {
+                      setInputText("");
+                      setRecommendation(null);
+                      runNewSearch({ text: "", filters: NO_FILTERS });
+                    }}
+                  >
+                    Clear all
+                  </button>
+                )}
+              </div>
+              {results.status === "ready" && results.total > 0 && (
+                <span className="result-count">
+                  About {results.total.toLocaleString()} issues ·{" "}
+                  {SORT_OPTIONS[search.filters.sort]}
+                </span>
+              )}
+            </div>
 
-        {view === "recommended" && recommendation.languages.length > 0 && (
-          <p className="view-note">
-            Matching the languages you use most:{" "}
-            {recommendation.languages.join(", ")}. Beginner-friendly issues
-            come first.
-          </p>
-        )}
-        {view === "saved" && savedIssues.length > 0 && (
-          <p className="view-note">
-            {account.savedSync
-              ? `Synced to @${account.user?.login} on every device you sign in on.`
-              : `Saved in this browser for @${account.user?.login}.`}
-          </p>
+            {recommendation && (
+              <p className="view-note">
+                {recommendation.error
+                  ? "Couldn't read your repositories for recommendations. Try again in a moment."
+                  : recommendation.languages.length === 0
+                    ? "Your public repositories don't show a language yet, so there's nothing to recommend."
+                    : (
+                      <>
+                        Recommended for you: beginner issues in{" "}
+                        {search.filters.language || "any language"}.
+                        {recommendation.languages.length > 1 && " Also try: "}
+                        {recommendation.languages
+                          .filter((language) => language !== search.filters.language)
+                          .map((language, index) => (
+                            <span key={language}>
+                              {index > 0 && " · "}
+                              <button
+                                type="button"
+                                className="text-button"
+                                onClick={() =>
+                                  runNewSearch({
+                                    filters: { ...search.filters, language },
+                                  })
+                                }
+                              >
+                                {language}
+                              </button>
+                            </span>
+                          ))}
+                      </>
+                    )}
+              </p>
+            )}
+          </>
         )}
 
         {signInFailed && (
           <p className="notice" role="alert">
-            Sign-in with GitHub didn&rsquo;t complete. Try again from the
-            menu.
-          </p>
-        )}
-
-        {notice && !loading && (
-          <p className="notice" role="status">
-            {notice}
+            Sign-in with GitHub didn&rsquo;t complete. Try again from the menu.
           </p>
         )}
 
         <div className="issues-list">
-          {loading && view !== "saved" ? (
-            <p>Loading issues from GitHub...</p>
-          ) : error && issues.length === 0 && view !== "saved" ? (
-            <p className="empty-state">{error}</p>
-          ) : sortedIssues.length > 0 ? (
-            currentIssues.map((issue) => (
+          {listMessage ? (
+            <p className="empty-state">{listMessage}</p>
+          ) : (
+            shownIssues.map((issue) => (
               <IssueCard
                 key={issue.id}
                 title={issue.title}
@@ -798,41 +683,48 @@ function App() {
                 language={issue.language}
                 repo={issue.repo}
                 url={issue.url}
+                comments={issue.comments}
+                updatedAt={issue.updatedAt}
                 saved={savedIds.has(issue.id)}
                 onToggleSave={signedIn ? () => toggleSaved(issue) : undefined}
               />
             ))
-          ) : (
-            <p className="empty-state">{emptyMessage}</p>
           )}
         </div>
 
-        {totalPages > 1 && (
+        {!listMessage && totalPages > 1 && (
           <div className="pagination">
             <button
               type="button"
-              onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}
-              disabled={currentPage === 1}
+              onClick={() => setPage(Math.max(1, page - 1))}
+              disabled={page === 1}
             >
               Previous
             </button>
 
             <span>
-              Page {currentPage} of {totalPages}
+              Page {page} of {totalPages}
             </span>
 
             <button
               type="button"
-              onClick={() =>
-                setCurrentPage((page) => Math.min(totalPages, page + 1))
-              }
-              disabled={currentPage === totalPages}
+              onClick={() => setPage(Math.min(totalPages, page + 1))}
+              disabled={page === totalPages}
             >
               Next
             </button>
           </div>
         )}
       </section>
+
+      {projectsOpen && (
+        <ProjectsDialog
+          language={search.filters.language}
+          signedIn={signedIn}
+          onPickProject={(project) => pickFromSuggestions({ project })}
+          onClose={() => setProjectsOpen(false)}
+        />
+      )}
     </main>
   );
 }

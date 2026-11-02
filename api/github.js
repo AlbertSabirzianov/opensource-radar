@@ -10,6 +10,7 @@ const ALLOWED_PATHS = [
   /^\/repos\/[\w.-]+\/[\w.-]+\/issues$/,
   /^\/rate_limit$/,
   /^\/search\/issues$/,
+  /^\/search\/repositories$/,
   /^\/user\/repos$/,
 ];
 

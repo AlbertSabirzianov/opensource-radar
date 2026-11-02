@@ -1,4 +1,11 @@
+import { previewText } from "../preview";
 import Icon from "./Icon";
+
+const dateFormat = new Intl.DateTimeFormat(undefined, {
+  day: "numeric",
+  month: "short",
+  year: "numeric",
+});
 
 function IssueCard({
   title,
@@ -7,33 +14,27 @@ function IssueCard({
   language,
   repo,
   url,
+  comments,
+  updatedAt,
   saved,
   onToggleSave,
 }) {
-  const cleanDescription = (description || "No description provided.")
-    .replace(/```[\s\S]*?```/g, " ")
-    .replace(/`[^`]*`/g, " ")
-    .replace(/!\[([^\]]*)\]\([^)]+\)/g, "$1")
-    .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
-    .replace(/<[^>]*>/g, " ")
-    .replace(/^#{1,6}\s+/gm, "")
-    .replace(/^\s*[-*+]\s+/gm, "")
-    .replace(/^\s*\d+\.\s+/gm, "")
-    .replace(/[*_~>#]/g, "")
-    .replace(/\s+/g, " ")
-    .trim();
-
-  const preview =
-    cleanDescription.length > 180
-      ? cleanDescription.slice(0, 180).trimEnd() + "..."
-      : cleanDescription;
+  const preview = previewText(description);
+  const details = [
+    repo,
+    typeof comments === "number" &&
+      (comments === 1 ? "1 comment" : `${comments} comments`),
+    updatedAt && `updated ${dateFormat.format(new Date(updatedAt))}`,
+  ]
+    .filter(Boolean)
+    .join(" · ");
 
   return (
     <article className="issue-card">
       <div className="issue-card-header">
         <span className="issue-label">{label}</span>
         <div className="issue-card-meta">
-          <span className="issue-language">{language}</span>
+          {language && <span className="issue-language">{language}</span>}
           {onToggleSave && (
             <button
               type="button"
@@ -54,7 +55,7 @@ function IssueCard({
       <p className="issue-description">{preview}</p>
 
       <div className="issue-card-footer">
-        <span>{repo}</span>
+        <span>{details}</span>
         <a href={url} target="_blank" rel="noopener noreferrer">
           View issue ↗
         </a>
