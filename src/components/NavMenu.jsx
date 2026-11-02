@@ -1,6 +1,7 @@
 import { useEffect, useId, useRef, useState } from "react";
 import { githubUrl } from "../github";
 import ContributionsDialog from "./ContributionsDialog";
+import ReportDialog from "./ReportDialog";
 import Icon from "./Icon";
 
 const THEME_OPTIONS = [
@@ -49,9 +50,12 @@ function NavMenu({
   savedCount,
   onShowSaved,
   onShowRecommended,
+  reportsAvailable,
+  theme,
 }) {
   const [open, setOpen] = useState(false);
   const [contributionsOpen, setContributionsOpen] = useState(false);
+  const [reportOpen, setReportOpen] = useState(false);
   const [now, setNow] = useState(0);
   const [rateLimit, setRateLimit] = useState(null);
   const wrapperRef = useRef(null);
@@ -312,20 +316,37 @@ function NavMenu({
             <Icon name="info" />
             About OpenSource Radar
           </button>
-          <a
-            role="menuitem"
-            className="menu-item"
-            href={REPORT_PROBLEM_URL}
-            target="_blank"
-            rel="noopener noreferrer"
-            onClick={() => closeMenu()}
-          >
-            <Icon name="bug" />
-            Report a problem
-            <span className="menu-item-trailing">
-              <Icon name="linkExternal" />
-            </span>
-          </a>
+          {reportsAvailable ? (
+            <button
+              type="button"
+              role="menuitem"
+              className="menu-item"
+              onClick={() => {
+                closeMenu();
+                setReportOpen(true);
+              }}
+            >
+              <Icon name="bug" />
+              Report a problem
+            </button>
+          ) : (
+            // Until the report form is set up on the server, fall back to
+            // opening a GitHub issue directly.
+            <a
+              role="menuitem"
+              className="menu-item"
+              href={REPORT_PROBLEM_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={() => closeMenu()}
+            >
+              <Icon name="bug" />
+              Report a problem
+              <span className="menu-item-trailing">
+                <Icon name="linkExternal" />
+              </span>
+            </a>
+          )}
 
           {user && (
             <>
@@ -345,6 +366,17 @@ function NavMenu({
             </>
           )}
         </div>
+      )}
+
+      {reportOpen && (
+        <ReportDialog
+          user={user}
+          theme={theme}
+          onClose={() => {
+            setReportOpen(false);
+            triggerRef.current?.focus();
+          }}
+        />
       )}
 
       {contributionsOpen && user && (

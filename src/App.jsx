@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Icon from "./components/Icon";
 import IssueCard from "./components/IssueCard";
 import NavMenu from "./components/NavMenu";
@@ -50,6 +50,55 @@ function writeSavedIssues(login, savedIssues) {
   } catch {
     // Storage full or blocked; the list still works until the page reloads.
   }
+}
+
+const SYNCED_KEY_PREFIX = "opensource-radar-saved-synced-";
+
+async function requestSaved(init) {
+  const response = await fetch("/api/saved", init);
+  if (!response.ok) throw new Error(`Saved issues request failed (${response.status})`);
+  return (await response.json()).items;
+}
+
+const putSavedIssues = (items) =>
+  requestSaved({
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ items }),
+  });
+
+// Brings this browser's saved list in line with the account's list in the
+// database. The first time on each device, anything saved here before sync
+// existed is merged in; after that the account's list wins, so an issue
+// removed on one device doesn't come back from another device's copy.
+async function syncSavedIssues(login, localIssues) {
+  const remote = await requestSaved();
+  const syncedKey = SYNCED_KEY_PREFIX + login;
+  let firstSync = true;
+  try {
+    firstSync = !localStorage.getItem(syncedKey);
+  } catch {
+    // Storage blocked: treat it as a first sync (merging is the safe choice).
+  }
+
+  let merged = remote;
+  if (firstSync) {
+    const remoteIds = new Set(remote.map((issue) => issue.id));
+    const localOnly = localIssues.filter((issue) => !remoteIds.has(issue.id));
+    if (localOnly.length > 0) {
+      merged = await putSavedIssues(
+        [...remote, ...localOnly].sort((a, b) => b.savedAt - a.savedAt),
+      );
+    }
+    try {
+      localStorage.setItem(syncedKey, "1");
+    } catch {
+      // Storage blocked; the next visit merges again, which is harmless.
+    }
+  }
+
+  writeSavedIssues(login, merged);
+  return merged;
 }
 
 // Keeps a copy of the issue so it stays in Saved even after it drops out of
@@ -183,8 +232,13 @@ function App() {
   const [account, setAccount] = useState({
     user: null,
     signInAvailable: false,
+    savedSync: false,
+    reportsAvailable: false,
     checked: false,
   });
+  // Bookmark changes are sent to the server one after another, so a quick
+  // save-then-unsave can't arrive out of order and leave the wrong list.
+  const savedQueue = useRef(Promise.resolve());
   const [signInFailed] = useState(
     () => new URLSearchParams(window.location.search).get("signin") === "failed",
   );
@@ -202,12 +256,27 @@ function App() {
         if (cancelled) return;
 
         const user = data?.user ?? null;
+        const savedSync = Boolean(data?.savedSync);
         setAccount({
           user,
           signInAvailable: Boolean(data?.signInAvailable),
+          savedSync,
+          reportsAvailable: Boolean(data?.reportsAvailable),
           checked: true,
         });
-        if (user) setSavedIssues(readSavedIssues(user.login));
+        if (!user) return;
+
+        const localIssues = readSavedIssues(user.login);
+        setSavedIssues(localIssues);
+        if (savedSync) {
+          syncSavedIssues(user.login, localIssues)
+            .then((synced) => {
+              if (!cancelled) setSavedIssues(synced);
+            })
+            .catch(() => {
+              // Database unreachable: keep this browser's copy for now.
+            });
+        }
       })
       .catch(() => {
         // Not available (e.g. a static preview); stay signed out.
@@ -234,6 +303,14 @@ function App() {
       : [toSavedIssue(issue), ...savedIssues];
     setSavedIssues(next);
     writeSavedIssues(account.user.login, next);
+
+    if (account.savedSync) {
+      savedQueue.current = savedQueue.current
+        .then(() => putSavedIssues(next))
+        .catch(() => {
+          // Kept in this browser; the next sign-in on a device reconciles.
+        });
+    }
   };
 
   const showRecommended = async () => {
@@ -554,6 +631,8 @@ function App() {
             savedCount={savedIssues.length}
             onShowSaved={() => showIssues("saved")}
             onShowRecommended={showRecommended}
+            reportsAvailable={account.reportsAvailable}
+            theme={theme}
           />
         </div>
       </nav>
@@ -685,7 +764,9 @@ function App() {
         )}
         {view === "saved" && savedIssues.length > 0 && (
           <p className="view-note">
-            Saved in this browser for @{account.user?.login}.
+            {account.savedSync
+              ? `Synced to @${account.user?.login} on every device you sign in on.`
+              : `Saved in this browser for @${account.user?.login}.`}
           </p>
         )}
 
