@@ -1,5 +1,4 @@
 import { useEffect, useId, useRef, useState } from "react";
-import { githubUrl } from "../github";
 import ContributionsDialog from "./ContributionsDialog";
 import ReportDialog from "./ReportDialog";
 import Icon from "./Icon";
@@ -27,23 +26,9 @@ function avatarSrc(url, size) {
   }
 }
 
-function formatUpdated(timestamp, now) {
-  if (!timestamp) return "Not loaded yet";
-
-  const minutes = Math.floor((now - timestamp) / 60000);
-  if (minutes < 1) return "Updated just now";
-  if (minutes < 60) return `Updated ${minutes} min ago`;
-
-  return `Updated ${Math.floor(minutes / 60)} h ago`;
-}
-
 function NavMenu({
   themePreference,
   onThemeChange,
-  onRefresh,
-  loading,
-  lastUpdated,
-  repositories,
   user,
   signInAvailable,
   onSignOut,
@@ -56,14 +41,11 @@ function NavMenu({
   const [open, setOpen] = useState(false);
   const [contributionsOpen, setContributionsOpen] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
-  const [now, setNow] = useState(0);
-  const [rateLimit, setRateLimit] = useState(null);
   const wrapperRef = useRef(null);
   const triggerRef = useRef(null);
   const menuRef = useRef(null);
   const aboutRef = useRef(null);
   const menuId = useId();
-  const statusId = useId();
   const aboutTitleId = useId();
 
   useEffect(() => {
@@ -81,17 +63,7 @@ function NavMenu({
     return () => document.removeEventListener("mousedown", handlePointerDown);
   }, [open]);
 
-  const openMenu = () => {
-    setNow(Date.now());
-    setOpen(true);
-
-    // GitHub doesn't count calls to /rate_limit against the limit. Signed-in
-    // users see their own 5,000-an-hour allowance.
-    fetch(githubUrl("/rate_limit", Boolean(user)))
-      .then((response) => (response.ok ? response.json() : null))
-      .then((data) => setRateLimit(data?.resources?.core ?? null))
-      .catch(() => setRateLimit(null));
-  };
+  const openMenu = () => setOpen(true);
 
   const closeMenu = ({ restoreFocus = false } = {}) => {
     setOpen(false);
@@ -131,13 +103,6 @@ function NavMenu({
       setOpen(false);
     }
   };
-
-  const rateLimitText = rateLimit
-    ? `${rateLimit.remaining.toLocaleString()} of ${rateLimit.limit.toLocaleString()} requests left`
-    : "";
-  const statusText = [formatUpdated(lastUpdated, now), rateLimitText]
-    .filter(Boolean)
-    .join(" · ");
 
   return (
     <div className="nav-menu" ref={wrapperRef}>
@@ -270,26 +235,6 @@ function NavMenu({
 
           <div className="menu-divider" role="separator" />
 
-          <button
-            type="button"
-            role="menuitem"
-            className="menu-item"
-            aria-describedby={statusId}
-            disabled={loading}
-            onClick={() => {
-              onRefresh();
-              closeMenu({ restoreFocus: true });
-            }}
-          >
-            <Icon name="sync" />
-            {loading ? "Loading..." : "Refresh issues"}
-          </button>
-          <p id={statusId} className="menu-status">
-            {statusText}
-          </p>
-
-          <div className="menu-divider" role="separator" />
-
           <a
             role="menuitem"
             className="menu-item"
@@ -418,15 +363,14 @@ function NavMenu({
             including ones labeled &ldquo;good first issue&rdquo; and
             &ldquo;help wanted&rdquo;.
           </p>
-          <p>Issues come straight from GitHub for these repositories:</p>
-          <ul>
-            {repositories.map((repo) => (
-              <li key={repo}>{repo}</li>
-            ))}
-          </ul>
           <p>
-            Results are saved in your browser for 10 minutes, so the site
-            stays fast and stays within GitHub&rsquo;s request limit.
+            It searches open issues across all public projects on GitHub,
+            using GitHub&rsquo;s own search. Results are kept for a few
+            minutes so going back and forth stays quick.
+          </p>
+          <p>
+            GitHub allows 10 searches a minute for visitors and 30 a minute
+            when you&rsquo;re signed in.
           </p>
         </div>
       </dialog>
