@@ -11,7 +11,8 @@ import {
 
 // Mounted only while open, so it always starts from the current filters.
 // Changes stay a draft until "Show results", so trying options out doesn't
-// spend GitHub searches.
+// spend GitHub searches. "Reset" is the exception: it applies straight away,
+// since that's what people expect it to do.
 function FiltersPanel({ id, filters, onApply, onClose }) {
   const [draft, setDraft] = useState(filters);
   const panelRef = useRef(null);
@@ -63,7 +64,7 @@ function FiltersPanel({ id, filters, onApply, onClose }) {
         <button
           type="button"
           className="text-button"
-          onClick={() => setDraft(DEFAULT_FILTERS)}
+          onClick={() => onApply(DEFAULT_FILTERS)}
         >
           Reset
         </button>
