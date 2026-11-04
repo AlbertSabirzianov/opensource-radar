@@ -3,20 +3,23 @@
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="manifest" href="/site.webmanifest" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>OpenSource Radar – Find your first open-source issue</title>
+    <title>Good First Issues on GitHub for Beginners | OpenSource Radar</title>
     <meta
       name="description"
-      content="Search beginner-friendly open issues across all of GitHub. Find good first issues nobody has taken yet, filter by language and project, and make your first open-source contribution."
+      content="Find good first issues across all of GitHub. Filter by language and project, skip issues already taken, and make your first open-source contribution."
     />
     <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)" />
     <meta name="theme-color" content="#0d1117" media="(prefers-color-scheme: dark)" />
     <link rel="canonical" href="https://opensource-radar-nine.vercel.app/" />
+    <meta name="google-site-verification" content="zgquRwnMiS7EeLcSk46ufq6-AagzHPi6cEXGJL153hc" />
 
     <!-- Preview when the link is shared. -->
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="OpenSource Radar" />
-    <meta property="og:title" content="OpenSource Radar – Find your first open-source issue" />
+    <meta property="og:title" content="OpenSource Radar – Find good first issues on GitHub" />
     <meta
       property="og:description"
       content="Search beginner-friendly open issues across all of GitHub, filter by language, and make your first open-source contribution."
@@ -46,9 +49,66 @@
         // Storage unavailable; the app falls back to light.
       }
     </script>
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@graph": [
+          {
+            "@type": "WebSite",
+            "@id": "https://opensource-radar-nine.vercel.app/#website",
+            "name": "OpenSource Radar",
+            "url": "https://opensource-radar-nine.vercel.app/",
+            "description": "Find good first issues across all of GitHub and make your first open-source contribution."
+          },
+          {
+            "@type": "WebApplication",
+            "name": "OpenSource Radar",
+            "url": "https://opensource-radar-nine.vercel.app/",
+            "image": "https://opensource-radar-nine.vercel.app/icon-512.png",
+            "applicationCategory": "DeveloperApplication",
+            "operatingSystem": "Any",
+            "browserRequirements": "Requires JavaScript",
+            "isAccessibleForFree": true,
+            "offers": {
+              "@type": "Offer",
+              "price": "0",
+              "priceCurrency": "USD"
+            },
+            "license": "https://opensource.org/licenses/MIT",
+            "sameAs": [
+              "https://github.com/opensource-radar/opensource-radar"
+            ],
+            "description": "Search beginner-friendly open issues across all of GitHub, filter by language and project, and skip issues someone has already taken."
+          }
+        ]
+      }
+    </script>
   </head>
   <body>
-    <div id="root"></div>
+    <!-- What crawlers and no-JavaScript visitors read. The app replaces it on load. -->
+    <div id="root">
+      <main class="app">
+        <nav class="navbar"><a class="navbar-brand" href="/">OpenSource Radar</a></nav>
+        <section class="hero">
+          <p class="eyebrow">YOUR OPEN-SOURCE JOURNEY STARTS HERE</p>
+          <h1>Find your first open-source issue.</h1>
+          <p class="description">Search open issues across all of GitHub.</p>
+          <noscript>
+            <p>
+              OpenSource Radar helps beginners find good first issues on GitHub: open issues
+              nobody has taken yet. Filter by programming language, regional language, project,
+              and popular, active projects, then contribute on GitHub. It needs JavaScript to
+              search. <a href="/about">Read about OpenSource Radar</a> or see the
+              <a href="https://github.com/opensource-radar/opensource-radar">project on GitHub</a>.
+            </p>
+          </noscript>
+        </section>
+      </main>
+    </div>
+    <script>
+      // /about shares this file, so don't flash the home page text there first.
+      if (location.pathname === "/about") document.getElementById("root").textContent = "";
+    </script>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>

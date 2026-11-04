@@ -120,6 +120,7 @@ opensource-radar/
 │   ├── recent.js           # Recent searches, kept in the browser
 │   ├── rateLimit.js        # Waiting out GitHub's limit, sharing repeat requests
 │   ├── links.js            # Links used around the site
+│   ├── pageMeta.js         # Page title and description for search engines
 │   ├── preview.js          # Safe plain-text issue previews
 │   └── github.js           # Chooses direct GitHub or the proxy
 ├── tests/                  # Automated tests

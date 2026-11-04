@@ -11,6 +11,7 @@ import SearchLimitNotice from "./components/SearchLimitNotice";
 import SearchBar from "./components/SearchBar";
 import { githubUrl } from "./github";
 import { ABOUT_PATH, isPlainClick } from "./links";
+import { setPageMeta } from "./pageMeta";
 import {
   MAX_LIMIT_RETRIES,
   fetchShared,
@@ -173,8 +174,6 @@ const searchLimitMessage = (signedIn, signInAvailable) =>
 const routeFromPath = () =>
   window.location.pathname === ABOUT_PATH ? "about" : "search";
 
-const SEARCH_TITLE = document.title;
-
 function App() {
   const [themePreference, setThemePreference] = useState(
     getInitialThemePreference,
@@ -322,8 +321,7 @@ function App() {
   }, []);
 
   useEffect(() => {
-    document.title =
-      route === "about" ? "About – OpenSource Radar" : SEARCH_TITLE;
+    setPageMeta(route);
   }, [route]);
 
   useEffect(() => {
