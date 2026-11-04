@@ -1,6 +1,6 @@
 // index.html holds the home page's details. This swaps them for the About
 // page, so search engines treat it as its own page rather than a copy of home.
-const SITE_URL = "https://opensource-radar-nine.vercel.app";
+const SITE_URL = "https://opensource-radar.com";
 
 const ABOUT = {
   title: "About OpenSource Radar – Find Your First Open-Source Issue",

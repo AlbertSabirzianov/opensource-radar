@@ -4,7 +4,7 @@
 
 OpenSource Radar helps developers find open issues they can contribute to, across all public projects on GitHub. It starts with beginner-friendly issues that nobody has taken yet, and lets you narrow things down by language, project, activity and more.
 
-🌐 **Live site:** [opensource-radar-nine.vercel.app](https://opensource-radar-nine.vercel.app/)
+🌐 **Live site:** [opensource-radar.com](https://opensource-radar.com/)
 
 ## ✨ Features
 
@@ -22,7 +22,7 @@ OpenSource Radar helps developers find open issues they can contribute to, acros
   - 🔀 **My contributions**, your pull requests at a glance
 - 🐞 **Report a problem** — a form inside the site that turns reports into GitHub issues
 - ⏳ **Waits out GitHub's search limit** — if the limit is reached, the page counts down and loads your results by itself
-- ℹ️ **About page** — why the project exists, how to use it and what it stores, at [`/about`](https://opensource-radar-nine.vercel.app/about)
+- ℹ️ **About page** — why the project exists, how to use it and what it stores, at [`/about`](https://opensource-radar.com/about)
 - 🌓 **Light, dark and system themes** using GitHub's own colours, and a layout that works on phones
 
 ## 🛠️ Tech stack
@@ -163,7 +163,7 @@ Contributions are welcome — especially from first-time contributors. See [CONT
 
 - GitHub: [@Deepti-Nanda](https://github.com/Deepti-Nanda)
 - Project repository: [opensource-radar/opensource-radar](https://github.com/opensource-radar/opensource-radar)
-- Live site: [OpenSource Radar](https://opensource-radar-nine.vercel.app/)
+- Live site: [OpenSource Radar](https://opensource-radar.com/)
 
 ---
 
