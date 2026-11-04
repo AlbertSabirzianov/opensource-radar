@@ -467,10 +467,27 @@ body {
 }
 
 .suggestions-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   padding: 6px 16px 4px;
   color: var(--muted);
   font-size: 12px;
   font-weight: 600;
+}
+
+.suggestions-clear {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--link);
+  font: inherit;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.suggestions-clear:hover {
+  text-decoration: underline;
 }
 
 .suggestion {
@@ -505,6 +522,28 @@ body {
   margin-left: auto;
   color: var(--muted);
   font-size: 12px;
+}
+
+.suggestion-remove {
+  display: inline-flex;
+  flex-shrink: 0;
+  margin: -3px -3px -3px auto;
+  padding: 5px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.suggestion-remove svg {
+  width: 14px;
+  height: 14px;
+}
+
+.suggestion-remove:hover {
+  background: var(--menu-hover);
+  color: var(--text);
 }
 
 /* Filters panel */

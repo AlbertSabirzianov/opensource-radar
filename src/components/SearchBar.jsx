@@ -1,20 +1,38 @@
 import { useId, useState } from "react";
+import {
+  clearRecentSearches,
+  forgetSearch,
+  readRecentSearches,
+  recentLabel,
+  rememberSearch,
+  visibleRecent,
+} from "../recent";
 import { BEGINNER_PRESETS, LANGUAGES, isValidProject } from "../search";
 import Icon from "./Icon";
 
 const MAX_LANGUAGE_MATCHES = 3;
+const RECENT_GROUP = "Recent";
 
 // Suggestions are worked out here from what's typed, so showing them never
 // uses up GitHub's search limit. Only choosing one runs a search.
-function buildSuggestions(text) {
+function buildSuggestions(text, recents) {
   const typed = text.trim();
   const lower = typed.toLowerCase();
   const matching = [];
+  const recentEntries = visibleRecent(recents, typed);
+  const isRecent = (type, value) =>
+    recentEntries.some(
+      (entry) => entry.type === type && entry.value.toLowerCase() === value.toLowerCase(),
+    );
 
   if (typed) {
     matching.push({ id: "search", type: "search", icon: "search", label: `Search for “${typed}”` });
 
-    LANGUAGES.filter((language) => language.toLowerCase().includes(lower))
+    // Anything shown under Recent isn't offered a second time.
+    LANGUAGES.filter(
+      (language) =>
+        language.toLowerCase().includes(lower) && !isRecent("language", language),
+    )
       .slice(0, MAX_LANGUAGE_MATCHES)
       .forEach((language) =>
         matching.push({
@@ -27,7 +45,7 @@ function buildSuggestions(text) {
         }),
       );
 
-    if (isValidProject(typed)) {
+    if (isValidProject(typed) && !isRecent("project", typed)) {
       const isRepo = typed.includes("/");
       matching.push({
         id: "project",
@@ -39,6 +57,14 @@ function buildSuggestions(text) {
       });
     }
   }
+
+  const recent = recentEntries.map((entry) => ({
+    id: `recent-${entry.type}-${entry.value}`,
+    type: "recent",
+    entry,
+    icon: "history",
+    label: recentLabel(entry),
+  }));
 
   const beginner = [
     ...BEGINNER_PRESETS.map((preset) => ({
@@ -58,6 +84,7 @@ function buildSuggestions(text) {
 
   return [
     { name: "Matching", items: matching },
+    { name: RECENT_GROUP, items: recent },
     { name: "Beginner friendly", items: beginner },
   ].filter((group) => group.items.length > 0);
 }
@@ -77,11 +104,12 @@ function SearchBar({
 }) {
   const [open, setOpen] = useState(false);
   const [activeIndex, setActiveIndex] = useState(-1);
+  const [recents, setRecents] = useState(readRecentSearches);
   const listId = useId();
   const optionId = (index) => `${listId}-option-${index}`;
 
   // One flat, numbered list (for the arrow keys), each item knowing its group.
-  const items = buildSuggestions(text)
+  const items = buildSuggestions(text, recents)
     .flatMap((group) => group.items.map((item) => ({ ...item, group: group.name })))
     .map((item, index) => ({ ...item, index }));
   const groupNames = [...new Set(items.map((item) => item.group))];
@@ -91,11 +119,41 @@ function SearchBar({
     setActiveIndex(-1);
   };
 
+  const remember = (type, value) => setRecents(rememberSearch({ type, value }));
+
+  const searchWords = (words) => {
+    if (words.trim()) remember("text", words);
+    onSubmit(words);
+  };
+
+  const pickLanguage = (language) => {
+    remember("language", language);
+    onPickLanguage(language);
+  };
+
+  const pickProject = (project) => {
+    remember("project", project);
+    onPickProject(project);
+  };
+
+  const runRecent = ({ type, value }) => {
+    if (type === "text") searchWords(value);
+    if (type === "language") pickLanguage(value);
+    if (type === "project") pickProject(value);
+  };
+
+  const forget = (entry) => {
+    setRecents(forgetSearch(entry));
+    // Keeps the highlight on the row that moved into this one's place.
+    setActiveIndex((index) => Math.min(index, items.length - 2));
+  };
+
   const choose = (item) => {
     close();
-    if (item.type === "search") onSubmit(text);
-    if (item.type === "language") onPickLanguage(item.value);
-    if (item.type === "project") onPickProject(item.value);
+    if (item.type === "search") searchWords(text);
+    if (item.type === "recent") runRecent(item.entry);
+    if (item.type === "language") pickLanguage(item.value);
+    if (item.type === "project") pickProject(item.value);
     if (item.type === "preset") onPreset(item.value);
     if (item.type === "projects") onShowProjects();
   };
@@ -114,6 +172,9 @@ function SearchBar({
     } else if (event.key === "Enter" && open && activeIndex >= 0) {
       event.preventDefault();
       choose(items[activeIndex]);
+    } else if (event.key === "Delete" && open && items[activeIndex]?.type === "recent") {
+      event.preventDefault();
+      forget(items[activeIndex].entry);
     }
   };
 
@@ -125,7 +186,7 @@ function SearchBar({
         onSubmit={(event) => {
           event.preventDefault();
           close();
-          onSubmit(text);
+          searchWords(text);
         }}
       >
         <div className="searchbar-field">
@@ -149,7 +210,10 @@ function SearchBar({
               setOpen(true);
               setActiveIndex(-1);
             }}
-            onFocus={() => setOpen(true)}
+            onFocus={() => {
+              setRecents(readRecentSearches());
+              setOpen(true);
+            }}
             onBlur={close}
             onKeyDown={handleKeyDown}
           />
@@ -177,6 +241,20 @@ function SearchBar({
             <div key={groupName} role="group" aria-label={groupName}>
               <div className="suggestions-heading" aria-hidden="true">
                 {groupName}
+                {groupName === RECENT_GROUP && (
+                  <button
+                    type="button"
+                    tabIndex={-1}
+                    className="suggestions-clear"
+                    onMouseDown={(event) => {
+                      event.preventDefault();
+                      setRecents(clearRecentSearches());
+                      setActiveIndex(-1);
+                    }}
+                  >
+                    Clear
+                  </button>
+                )}
               </div>
               {items
                 .filter((item) => item.group === groupName)
@@ -186,6 +264,7 @@ function SearchBar({
                     id={optionId(item.index)}
                     role="option"
                     aria-selected={item.index === activeIndex}
+                    aria-keyshortcuts={item.type === "recent" ? "Delete" : undefined}
                     className={`suggestion${item.index === activeIndex ? " suggestion-active" : ""}`}
                     // mousedown, not click: it fires before the input loses
                     // focus, so the list is still there to be clicked.
@@ -198,6 +277,22 @@ function SearchBar({
                     <Icon name={item.icon} />
                     <span className="suggestion-label">{item.label}</span>
                     {item.hint && <span className="suggestion-hint">{item.hint}</span>}
+                    {item.type === "recent" && (
+                      <button
+                        type="button"
+                        tabIndex={-1}
+                        className="suggestion-remove"
+                        aria-label={`Remove ${item.label} from recent searches`}
+                        title="Remove"
+                        onMouseDown={(event) => {
+                          event.preventDefault();
+                          event.stopPropagation();
+                          forget(item.entry);
+                        }}
+                      >
+                        <Icon name="x" />
+                      </button>
+                    )}
                   </div>
                 ))}
             </div>
