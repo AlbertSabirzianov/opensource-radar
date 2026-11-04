@@ -4,12 +4,14 @@ import {
   activeFilterChips,
   buildQuery,
   popularReposPath,
+  regionalName,
   reposInQuery,
   searchPath,
   stateFromUrl,
   stateToUrl,
   toIssue,
 } from "../src/search.js";
+import { INDIAN_LANGUAGE_CODES, SPOKEN_LANGUAGES } from "../src/spokenLanguages.js";
 
 const allFilters = {
   ...DEFAULT_FILTERS,
@@ -167,5 +169,50 @@ describe("popular, active projects", () => {
     expect(activeFilterChips(filters).map((chip) => chip.label)).toContain(
       "Popular projects only",
     );
+  });
+});
+
+describe("regional language filter", () => {
+  it("is off by default", () => {
+    expect(DEFAULT_FILTERS.regional).toBe("");
+    expect(activeFilterChips(DEFAULT_FILTERS).map((chip) => chip.key)).not.toContain("regional");
+  });
+
+  it("searches the English and native names", () => {
+    const query = buildQuery({ ...DEFAULT_FILTERS, regional: "hi" }, "");
+    expect(query).toContain('(Hindi OR "हिन्दी")');
+  });
+
+  it("uses the everyday name and quotes names with spaces", () => {
+    expect(regionalName("el")).toBe("Greek");
+    expect(buildQuery({ ...DEFAULT_FILTERS, regional: "el" }, "")).toContain('(Greek OR "Ελληνικά")');
+    expect(buildQuery({ ...DEFAULT_FILTERS, regional: "nd" }, "")).toContain('"North Ndebele"');
+  });
+
+  it("searches one name when there is no native one", () => {
+    const query = buildQuery({ ...DEFAULT_FILTERS, regional: "ab" }, "");
+    expect(query).toContain("Abkhazian");
+    expect(query).not.toContain(" OR ");
+  });
+
+  it("survives the address bar, and ignores unknown languages", () => {
+    const filters = { ...DEFAULT_FILTERS, regional: "ta" };
+    expect(stateFromUrl(stateToUrl(filters, "", 1)).filters.regional).toBe("ta");
+    expect(stateFromUrl("?labels=bug&region=klingon").filters.regional).toBe("");
+  });
+
+  it("has a removable chip that says what it does", () => {
+    const chip = activeFilterChips({ ...DEFAULT_FILTERS, regional: "hi" }).find(
+      ({ key }) => key === "regional",
+    );
+    expect(chip.label).toBe("Mentions Hindi");
+    expect(chip.remove({ ...DEFAULT_FILTERS, regional: "hi" }).regional).toBe("");
+  });
+
+  it("offers GitHub's full list with unique codes", () => {
+    const codes = SPOKEN_LANGUAGES.map(({ code }) => code);
+    expect(codes).toHaveLength(184);
+    expect(new Set(codes).size).toBe(184);
+    expect(INDIAN_LANGUAGE_CODES.every((code) => codes.includes(code))).toBe(true);
   });
 });
