@@ -11,7 +11,9 @@ OpenSource Radar helps developers find open issues they can contribute to, acros
 - 🔍 **Search all of GitHub** — live search over open issues in every public repository
 - 🌱 **Beginner friendly by default** — starts with `good first issue` issues that nobody has taken yet
 - 💡 **Suggestions while you type** — matching languages and projects, plus quick starting points: good first issues nobody has taken, updated today, docs and small fixes, and projects that welcome beginners
-- 🎛️ **Filters** — type of issue, not taken yet, no pull request yet, comments, last updated, language, project or organisation, popular and active projects only, and sort order
+- 🕘 **Recent searches** — your last few searches appear in the search box, kept only in your browser
+- 🎛️ **Filters** — type of issue, not taken yet, no pull request yet, comments, last updated, programming language, regional language, project or organisation, popular and active projects only, and sort order
+- 🌏 **Regional language filter** — finds issues that mention one of GitHub's 184 spoken languages, in English or its own script, such as translation work. GitHub can't filter by the language an issue is written in, so these are matches on the words
 - ⭐ **Project details on cards** — stars, a warning for archived or quiet projects, and a link to the contributing guide
 - 🔗 **Shareable searches** — the search lives in the address bar, so a link opens exactly the same results
 - 🔐 **Sign in with GitHub** — higher search limits, plus:
@@ -19,6 +21,8 @@ OpenSource Radar helps developers find open issues they can contribute to, acros
   - ✨ **Recommended for you**, based on the languages in your own repositories
   - 🔀 **My contributions**, your pull requests at a glance
 - 🐞 **Report a problem** — a form inside the site that turns reports into GitHub issues
+- ⏳ **Waits out GitHub's search limit** — if the limit is reached, the page counts down and loads your results by itself
+- ℹ️ **About page** — why the project exists, how to use it and what it stores, at [`/about`](https://opensource-radar-nine.vercel.app/about)
 - 🌓 **Light, dark and system themes** using GitHub's own colours, and a layout that works on phones
 
 ## 🛠️ Tech stack
@@ -112,19 +116,24 @@ opensource-radar/
 │   ├── components/         # Search bar, filters, issue cards, menu, dialogs
 │   ├── App.jsx             # Page layout and state
 │   ├── search.js           # Filters ⇄ GitHub search query ⇄ address bar
+│   ├── spokenLanguages.js  # GitHub's spoken language list, for the regional filter
+│   ├── recent.js           # Recent searches, kept in the browser
+│   ├── rateLimit.js        # Waiting out GitHub's limit, sharing repeat requests
+│   ├── links.js            # Links used around the site
 │   ├── preview.js          # Safe plain-text issue previews
 │   └── github.js           # Chooses direct GitHub or the proxy
 ├── tests/                  # Automated tests
 ├── .github/                # Issue and pull request templates, CI
 ├── .env.example            # Settings template
-└── vercel.json             # Maps /auth/* to the sign-in functions
+└── vercel.json             # Maps /auth/* to the sign-in functions, and /about to the app
 ```
 
 ## ⚙️ How it works
 
 - **Search** uses GitHub's issue search. Your filters become a GitHub query (for example `label:"good first issue" no:assignee language:python`), which is also kept in the address bar.
 - **Visitors** call GitHub directly, which allows 10 searches a minute. **Signed-in users** go through `api/github.js`, which adds their own token (30 searches a minute). The proxy only allows the few read-only endpoints the site needs.
-- **Results are cached** for a few minutes, so going back to a page doesn't spend another search.
+- **Results are cached** for a few minutes, so going back to a page doesn't spend another search. A repeat of a search that's still on its way shares its answer, and a search you moved on from is still kept.
+- **At GitHub's limit,** the page waits for the limit to reset and searches again by itself, with a few seconds' random spread so people on the same network don't all retry together. It gives up after 5 tries in a row, and only retries real limit responses.
 - **Sign-in** uses GitHub OAuth with a `state` check. The token is stored encrypted in an `HttpOnly` cookie and never reaches the browser's JavaScript.
 
 ## 🗺️ Roadmap
@@ -134,8 +143,9 @@ opensource-radar/
 - [x] Sign in with GitHub, saved issues synced across devices
 - [x] Recommendations and contributions for signed-in users
 - [x] In-site report form
-- [ ] Logo and sharing preview image
+- [x] Logo and sharing preview image
 - [x] Project details on issue cards and a popular-projects filter
+- [x] Recent searches, regional language filter and About page
 - [ ] Saved searches
 
 ## 🤝 Contributing

@@ -1860,3 +1860,17 @@ body {
     justify-self: start;
   }
 }
+
+/* Waiting for GitHub's search limit to reset */
+.search-limit-notice p {
+  margin: 0;
+}
+
+.search-limit-notice strong {
+  color: var(--text);
+}
+
+.search-limit-notice .search-limit-tip {
+  margin-top: 6px;
+  font-size: 14px;
+}
