@@ -1,4 +1,5 @@
 import { useEffect, useId, useRef, useState } from "react";
+import AboutPage from "./components/AboutPage";
 import FiltersPanel from "./components/FiltersPanel";
 import Footer from "./components/Footer";
 import Icon from "./components/Icon";
@@ -7,6 +8,7 @@ import NavMenu from "./components/NavMenu";
 import ProjectsDialog from "./components/ProjectsDialog";
 import SearchBar from "./components/SearchBar";
 import { githubUrl } from "./github";
+import { ABOUT_PATH, isPlainClick } from "./links";
 import {
   DEFAULT_FILTERS,
   MAX_RESULTS,
@@ -166,6 +168,11 @@ function searchLimitMessage(response, signedIn, signInAvailable) {
   }.`;
 }
 
+const routeFromPath = () =>
+  window.location.pathname === ABOUT_PATH ? "about" : "search";
+
+const SEARCH_TITLE = document.title;
+
 function App() {
   const [themePreference, setThemePreference] = useState(
     getInitialThemePreference,
@@ -283,6 +290,7 @@ function App() {
   const [recommendation, setRecommendation] = useState(null);
   // "search" or "saved": which list is shown.
   const [view, setView] = useState("search");
+  const [route, setRoute] = useState(routeFromPath);
   const [savedPage, setSavedPage] = useState(1);
   const filtersPanelId = useId();
   const navMenuRef = useRef(null);
@@ -294,17 +302,30 @@ function App() {
   // Keep the address bar in step with the search (this also drops the
   // one-off "?signin=failed" once it has been read).
   useEffect(() => {
+    if (route === "about") return;
     window.history.replaceState(
       null,
       "",
       stateToUrl(search.filters, search.text, search.page),
     );
-  }, [search]);
+  }, [search, route]);
+
+  // The browser's back and forward buttons move between search and About.
+  useEffect(() => {
+    const syncRoute = () => setRoute(routeFromPath());
+    window.addEventListener("popstate", syncRoute);
+    return () => window.removeEventListener("popstate", syncRoute);
+  }, []);
+
+  useEffect(() => {
+    document.title =
+      route === "about" ? "About – OpenSource Radar" : SEARCH_TITLE;
+  }, [route]);
 
   useEffect(() => {
     // Wait until we know whether the visitor is signed in, so the search
     // goes through the right route (and their own limit) the first time.
-    if (!account.checked || view === "saved") return undefined;
+    if (!account.checked || view === "saved" || route === "about") return undefined;
 
     let cancelled = false;
     const { filters } = search;
@@ -436,14 +457,30 @@ function App() {
     return () => {
       cancelled = true;
     };
-  }, [path, search, account.checked, signedIn, view, account.signInAvailable]);
+  }, [path, search, account.checked, signedIn, view, route, account.signInAvailable]);
 
   const scrollToResults = () =>
     document
       .querySelector(".issues-section")
       ?.scrollIntoView({ behavior: "smooth", block: "start" });
 
+  const showAbout = () => {
+    if (route === "about") return;
+    window.history.pushState(null, "", ABOUT_PATH);
+    setRoute("about");
+    setFiltersOpen(false);
+    window.scrollTo(0, 0);
+  };
+
+  const leaveAbout = () => {
+    if (route !== "about") return;
+    window.history.pushState(null, "", "/");
+    setRoute("search");
+    window.scrollTo(0, 0);
+  };
+
   const runNewSearch = (changes) => {
+    leaveAbout();
     setSearch((current) => ({ ...current, ...changes, page: 1 }));
     setView("search");
     setFiltersOpen(false);
@@ -479,19 +516,11 @@ function App() {
     });
 
   // The site title goes back to the starting search without reloading.
-  // Ctrl/Cmd/Shift-click or a middle click still opens it like a normal link.
   const goHome = (event) => {
-    if (
-      event.button !== 0 ||
-      event.metaKey ||
-      event.ctrlKey ||
-      event.shiftKey ||
-      event.altKey
-    ) {
-      return;
-    }
+    if (!isPlainClick(event)) return;
 
     event.preventDefault();
+    leaveAbout();
     setInputText("");
     setRecommendation(null);
     setFiltersOpen(false);
@@ -524,6 +553,7 @@ function App() {
   };
 
   const showSaved = () => {
+    leaveAbout();
     setView("saved");
     setSavedPage(1);
     scrollToResults();
@@ -532,6 +562,7 @@ function App() {
   // Beginner issues in the language the user codes in most (from their
   // public repositories), with their other languages one click away.
   const showRecommended = async () => {
+    leaveAbout();
     try {
       const response = await fetch(
         githubUrl("/user/repos?per_page=100&sort=pushed&affiliation=owner", true),
@@ -658,13 +689,16 @@ function App() {
               savedCount={savedIssues.length}
               onShowSaved={showSaved}
               onShowRecommended={showRecommended}
+            onShowAbout={showAbout}
               reportsAvailable={account.reportsAvailable}
               theme={theme}
             />
           </div>
         </nav>
 
-        <section className="hero">
+        {route === "about" && <AboutPage onBack={leaveAbout} />}
+
+        <section className="hero" hidden={route === "about"}>
           <p className="eyebrow">YOUR OPEN-SOURCE JOURNEY STARTS HERE</p>
           <h1>Find your first open-source issue.</h1>
           <p className="description">Search open issues across all of GitHub.</p>
@@ -699,7 +733,7 @@ function App() {
           )}
         </section>
 
-        <section className="issues-section" aria-live="polite">
+        <section className="issues-section" aria-live="polite" hidden={route === "about"}>
           {view === "saved" ? (
             <>
               <div className="issues-header">
@@ -884,7 +918,7 @@ function App() {
           scrollToResults();
         }}
         onShowSaved={showSaved}
-        onShowAbout={() => navMenuRef.current?.showAbout()}
+        onShowAbout={showAbout}
         onShowReport={() => navMenuRef.current?.showReport()}
       />
     </>

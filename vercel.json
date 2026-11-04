@@ -1,5 +1,6 @@
 {
   "rewrites": [
-    { "source": "/auth/:action", "destination": "/api/auth/:action" }
+    { "source": "/auth/:action", "destination": "/api/auth/:action" },
+    { "source": "/about", "destination": "/index.html" }
   ]
 }
