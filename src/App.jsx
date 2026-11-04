@@ -3,6 +3,7 @@ import FiltersPanel from "./components/FiltersPanel";
 import Footer from "./components/Footer";
 import Icon from "./components/Icon";
 import IssueCard from "./components/IssueCard";
+import Logo from "./components/Logo";
 import NavMenu from "./components/NavMenu";
 import ProjectsDialog from "./components/ProjectsDialog";
 import SearchBar from "./components/SearchBar";
@@ -645,6 +646,7 @@ function App() {
       <main className="app">
         <nav className="navbar">
           <a className="navbar-brand" href="/" onClick={goHome}>
+            <Logo />
             OpenSource Radar
           </a>
           <div className="nav-actions">
