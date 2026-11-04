@@ -8,6 +8,7 @@ import {
 } from "../links";
 import { BEGINNER_PRESETS } from "../search";
 import Icon from "./Icon";
+import Logo from "./Logo";
 
 const FIRST_ISSUES_PRESET = BEGINNER_PRESETS.find((preset) => preset.id === "first-issues");
 const DOCS_PRESET = BEGINNER_PRESETS.find((preset) => preset.id === "docs");
@@ -27,19 +28,6 @@ function FooterButton({ onClick, children }) {
     <button type="button" className="footer-link" onClick={onClick}>
       {children}
     </button>
-  );
-}
-
-// Decorative placeholder until the project has its own logo.
-function RadarMark() {
-  return (
-    <svg className="footer-mark" viewBox="0 0 32 32" width="28" height="28" aria-hidden="true">
-      <circle cx="16" cy="16" r="14.5" fill="none" stroke="currentColor" strokeWidth="2" />
-      <circle cx="16" cy="16" r="8.5" fill="none" stroke="currentColor" strokeWidth="2" opacity=".55" />
-      <path d="M16 16 L16 1.5 A14.5 14.5 0 0 1 26.25 5.75 Z" fill="currentColor" opacity=".35" />
-      <path d="M16 16 L26.25 5.75" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-      <circle cx="16" cy="16" r="2.4" fill="currentColor" />
-    </svg>
   );
 }
 
@@ -74,7 +62,7 @@ function Footer({
       <div className="footer-top">
         <div className="footer-brand">
           <div className="footer-name">
-            <RadarMark />
+            <Logo />
             OpenSource Radar
           </div>
           <p className="footer-tagline">
