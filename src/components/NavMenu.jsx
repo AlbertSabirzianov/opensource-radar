@@ -1,4 +1,5 @@
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useId, useImperativeHandle, useRef, useState } from "react";
+import { CONTRIBUTION_GUIDE_URL, REPORT_PROBLEM_URL } from "../links";
 import ContributionsDialog from "./ContributionsDialog";
 import ReportDialog from "./ReportDialog";
 import Icon from "./Icon";
@@ -9,10 +10,6 @@ const THEME_OPTIONS = [
   { value: "system", label: "Sync with system", icon: "deviceDesktop" },
 ];
 
-const CONTRIBUTION_GUIDE_URL =
-  "https://docs.github.com/en/get-started/exploring-projects-on-github/contributing-to-a-project";
-const REPORT_PROBLEM_URL =
-  "https://github.com/opensource-radar/opensource-radar/issues/new";
 const MENU_ITEM_SELECTOR = '[role^="menuitem"]:not(:disabled)';
 
 // GitHub avatar URLs accept ?s= for the size; ask for 2x for sharp edges.
@@ -37,6 +34,7 @@ function NavMenu({
   onShowRecommended,
   reportsAvailable,
   theme,
+  ref,
 }) {
   const [open, setOpen] = useState(false);
   const [contributionsOpen, setContributionsOpen] = useState(false);
@@ -45,8 +43,26 @@ function NavMenu({
   const triggerRef = useRef(null);
   const menuRef = useRef(null);
   const aboutRef = useRef(null);
+  const returnFocusRef = useRef(null);
   const menuId = useId();
   const aboutTitleId = useId();
+
+  // Lets the footer open these dialogs; focus then returns to the footer link.
+  useImperativeHandle(ref, () => ({
+    showAbout() {
+      returnFocusRef.current = document.activeElement;
+      aboutRef.current?.showModal();
+    },
+    showReport() {
+      returnFocusRef.current = document.activeElement;
+      setReportOpen(true);
+    },
+  }));
+
+  const restoreDialogFocus = () => {
+    (returnFocusRef.current ?? triggerRef.current)?.focus();
+    returnFocusRef.current = null;
+  };
 
   useEffect(() => {
     if (!open) return undefined;
@@ -319,7 +335,7 @@ function NavMenu({
           theme={theme}
           onClose={() => {
             setReportOpen(false);
-            triggerRef.current?.focus();
+            restoreDialogFocus();
           }}
         />
       )}
@@ -344,7 +360,7 @@ function NavMenu({
             aboutRef.current.close();
           }
         }}
-        onClose={() => triggerRef.current?.focus()}
+        onClose={restoreDialogFocus}
       >
         <div className="about-header">
           <h2 id={aboutTitleId}>About OpenSource Radar</h2>
