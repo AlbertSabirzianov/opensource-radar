@@ -1,5 +1,6 @@
 import { useEffect, useId, useRef, useState } from "react";
 import FiltersPanel from "./components/FiltersPanel";
+import Footer from "./components/Footer";
 import Icon from "./components/Icon";
 import IssueCard from "./components/IssueCard";
 import NavMenu from "./components/NavMenu";
@@ -284,6 +285,7 @@ function App() {
   const [view, setView] = useState("search");
   const [savedPage, setSavedPage] = useState(1);
   const filtersPanelId = useId();
+  const navMenuRef = useRef(null);
   const filtersButtonFocus = () =>
     document.querySelector(".filters-button")?.focus();
 
@@ -639,235 +641,253 @@ function App() {
   }
 
   return (
-    <main className="app">
-      <nav className="navbar">
-        <a className="navbar-brand" href="/" onClick={goHome}>
-          OpenSource Radar
-        </a>
-        <div className="nav-actions">
-          <NavMenu
-            themePreference={themePreference}
-            onThemeChange={changeThemePreference}
-            user={account.user}
-            signInAvailable={account.signInAvailable}
-            onSignOut={signOut}
-            savedCount={savedIssues.length}
-            onShowSaved={showSaved}
-            onShowRecommended={showRecommended}
-            reportsAvailable={account.reportsAvailable}
-            theme={theme}
+    <>
+      <main className="app">
+        <nav className="navbar">
+          <a className="navbar-brand" href="/" onClick={goHome}>
+            OpenSource Radar
+          </a>
+          <div className="nav-actions">
+            <NavMenu
+              ref={navMenuRef}
+              themePreference={themePreference}
+              onThemeChange={changeThemePreference}
+              user={account.user}
+              signInAvailable={account.signInAvailable}
+              onSignOut={signOut}
+              savedCount={savedIssues.length}
+              onShowSaved={showSaved}
+              onShowRecommended={showRecommended}
+              reportsAvailable={account.reportsAvailable}
+              theme={theme}
+            />
+          </div>
+        </nav>
+
+        <section className="hero">
+          <p className="eyebrow">YOUR OPEN-SOURCE JOURNEY STARTS HERE</p>
+          <h1>Find your first open-source issue.</h1>
+          <p className="description">Search open issues across all of GitHub.</p>
+
+          <SearchBar
+            text={inputText}
+            onTextChange={setInputText}
+            onSubmit={submitText}
+            onPickLanguage={(language) => pickFromSuggestions({ language })}
+            onPickProject={(project) => pickFromSuggestions({ project })}
+            onPreset={applyPreset}
+            onShowProjects={() => setProjectsOpen(true)}
+            filtersCount={countActiveFilters(search.filters)}
+            filtersOpen={filtersOpen}
+            filtersPanelId={filtersPanelId}
+            onToggleFilters={() => setFiltersOpen((open) => !open)}
           />
-        </div>
-      </nav>
 
-      <section className="hero">
-        <p className="eyebrow">YOUR OPEN-SOURCE JOURNEY STARTS HERE</p>
-        <h1>Find your first open-source issue.</h1>
-        <p className="description">Search open issues across all of GitHub.</p>
+          {filtersOpen && (
+            <FiltersPanel
+              id={filtersPanelId}
+              filters={search.filters}
+              onApply={(filters) => {
+                applyFilters(filters);
+                filtersButtonFocus();
+              }}
+              onClose={() => {
+                setFiltersOpen(false);
+                filtersButtonFocus();
+              }}
+            />
+          )}
+        </section>
 
-        <SearchBar
-          text={inputText}
-          onTextChange={setInputText}
-          onSubmit={submitText}
-          onPickLanguage={(language) => pickFromSuggestions({ language })}
-          onPickProject={(project) => pickFromSuggestions({ project })}
-          onPreset={applyPreset}
-          onShowProjects={() => setProjectsOpen(true)}
-          filtersCount={countActiveFilters(search.filters)}
-          filtersOpen={filtersOpen}
-          filtersPanelId={filtersPanelId}
-          onToggleFilters={() => setFiltersOpen((open) => !open)}
-        />
-
-        {filtersOpen && (
-          <FiltersPanel
-            id={filtersPanelId}
-            filters={search.filters}
-            onApply={(filters) => {
-              applyFilters(filters);
-              filtersButtonFocus();
-            }}
-            onClose={() => {
-              setFiltersOpen(false);
-              filtersButtonFocus();
-            }}
-          />
-        )}
-      </section>
-
-      <section className="issues-section" aria-live="polite">
-        {view === "saved" ? (
-          <>
-            <div className="issues-header">
-              <h2>Saved issues</h2>
-              <button
-                type="button"
-                className="back-button"
-                onClick={() => setView("search")}
-              >
-                <Icon name="arrowLeft" />
-                Back to search
-              </button>
-            </div>
-            {savedIssues.length > 0 && (
-              <p className="view-note">
-                {account.savedSync
-                  ? `Synced to @${account.user?.login} on every device you sign in on.`
-                  : `Saved in this browser for @${account.user?.login}.`}
-              </p>
-            )}
-          </>
-        ) : (
-          <>
-            <h2 className="sr-only">Search results</h2>
-            <div className="results-bar">
-              <div className="active-filters">
-                {search.text && (
-                  <button
-                    type="button"
-                    className="filter-chip"
-                    aria-label={`Remove search words: ${search.text}`}
-                    onClick={() => submitText("")}
-                  >
-                    &ldquo;{search.text}&rdquo; <span aria-hidden="true">×</span>
-                  </button>
-                )}
-                {chips.map((chip) => (
-                  <button
-                    key={chip.key}
-                    type="button"
-                    className="filter-chip"
-                    aria-label={`Remove filter: ${chip.label}`}
-                    onClick={() => applyFilters(chip.remove(search.filters))}
-                  >
-                    {chip.label} <span aria-hidden="true">×</span>
-                  </button>
-                ))}
-                {(chips.length > 0 || search.text) && (
-                  <button
-                    type="button"
-                    className="text-button"
-                    onClick={() => {
-                      setInputText("");
-                      setRecommendation(null);
-                      runNewSearch({ text: "", filters: NO_FILTERS });
-                    }}
-                  >
-                    Clear all
-                  </button>
+        <section className="issues-section" aria-live="polite">
+          {view === "saved" ? (
+            <>
+              <div className="issues-header">
+                <h2>Saved issues</h2>
+                <button
+                  type="button"
+                  className="back-button"
+                  onClick={() => setView("search")}
+                >
+                  <Icon name="arrowLeft" />
+                  Back to search
+                </button>
+              </div>
+              {savedIssues.length > 0 && (
+                <p className="view-note">
+                  {account.savedSync
+                    ? `Synced to @${account.user?.login} on every device you sign in on.`
+                    : `Saved in this browser for @${account.user?.login}.`}
+                </p>
+              )}
+            </>
+          ) : (
+            <>
+              <h2 className="sr-only">Search results</h2>
+              <div className="results-bar">
+                <div className="active-filters">
+                  {search.text && (
+                    <button
+                      type="button"
+                      className="filter-chip"
+                      aria-label={`Remove search words: ${search.text}`}
+                      onClick={() => submitText("")}
+                    >
+                      &ldquo;{search.text}&rdquo; <span aria-hidden="true">×</span>
+                    </button>
+                  )}
+                  {chips.map((chip) => (
+                    <button
+                      key={chip.key}
+                      type="button"
+                      className="filter-chip"
+                      aria-label={`Remove filter: ${chip.label}`}
+                      onClick={() => applyFilters(chip.remove(search.filters))}
+                    >
+                      {chip.label} <span aria-hidden="true">×</span>
+                    </button>
+                  ))}
+                  {(chips.length > 0 || search.text) && (
+                    <button
+                      type="button"
+                      className="text-button"
+                      onClick={() => {
+                        setInputText("");
+                        setRecommendation(null);
+                        runNewSearch({ text: "", filters: NO_FILTERS });
+                      }}
+                    >
+                      Clear all
+                    </button>
+                  )}
+                </div>
+                {results.status === "ready" && results.total > 0 && (
+                  <span className="result-count">
+                    About {results.total.toLocaleString()} issues ·{" "}
+                    {SORT_OPTIONS[search.filters.sort]}
+                  </span>
                 )}
               </div>
-              {results.status === "ready" && results.total > 0 && (
-                <span className="result-count">
-                  About {results.total.toLocaleString()} issues ·{" "}
-                  {SORT_OPTIONS[search.filters.sort]}
-                </span>
+
+              {popularRepos.length > 0 && results.status === "ready" && (
+                <p className="view-note">From popular, active projects: {popularNote}.</p>
               )}
-            </div>
 
-            {popularRepos.length > 0 && results.status === "ready" && (
-              <p className="view-note">From popular, active projects: {popularNote}.</p>
-            )}
-
-            {recommendation && (
-              <p className="view-note">
-                {recommendation.error
-                  ? "Couldn't read your repositories for recommendations. Try again in a moment."
-                  : recommendation.languages.length === 0
-                    ? "Your public repositories don't show a language yet, so there's nothing to recommend."
-                    : (
-                      <>
-                        Recommended for you: beginner issues in{" "}
-                        {search.filters.language || "any language"}.
-                        {recommendation.languages.length > 1 && " Also try: "}
-                        {recommendation.languages
-                          .filter((language) => language !== search.filters.language)
-                          .map((language, index) => (
-                            <span key={language}>
-                              {index > 0 && " · "}
-                              <button
-                                type="button"
-                                className="text-button"
-                                onClick={() =>
-                                  runNewSearch({
-                                    filters: { ...search.filters, language },
-                                  })
-                                }
-                              >
-                                {language}
-                              </button>
-                            </span>
-                          ))}
-                      </>
-                    )}
-              </p>
-            )}
-          </>
-        )}
-
-        {signInFailed && (
-          <p className="notice" role="alert">
-            Sign-in with GitHub didn&rsquo;t complete. Try again from the menu.
-          </p>
-        )}
-
-        <div className="issues-list">
-          {listMessage ? (
-            <p className="empty-state">{listMessage}</p>
-          ) : (
-            shownIssues.map((issue) => (
-              <IssueCard
-                key={issue.id}
-                title={issue.title}
-                description={issue.description}
-                label={issue.label}
-                language={issue.language}
-                repo={issue.repo}
-                url={issue.url}
-                comments={issue.comments}
-                updatedAt={issue.updatedAt}
-                saved={savedIds.has(issue.id)}
-                onToggleSave={signedIn ? () => toggleSaved(issue) : undefined}
-                project={projects[issue.repo.replace(" / ", "/")]}
-              />
-            ))
+              {recommendation && (
+                <p className="view-note">
+                  {recommendation.error
+                    ? "Couldn't read your repositories for recommendations. Try again in a moment."
+                    : recommendation.languages.length === 0
+                      ? "Your public repositories don't show a language yet, so there's nothing to recommend."
+                      : (
+                        <>
+                          Recommended for you: beginner issues in{" "}
+                          {search.filters.language || "any language"}.
+                          {recommendation.languages.length > 1 && " Also try: "}
+                          {recommendation.languages
+                            .filter((language) => language !== search.filters.language)
+                            .map((language, index) => (
+                              <span key={language}>
+                                {index > 0 && " · "}
+                                <button
+                                  type="button"
+                                  className="text-button"
+                                  onClick={() =>
+                                    runNewSearch({
+                                      filters: { ...search.filters, language },
+                                    })
+                                  }
+                                >
+                                  {language}
+                                </button>
+                              </span>
+                            ))}
+                        </>
+                      )}
+                </p>
+              )}
+            </>
           )}
-        </div>
 
-        {!listMessage && totalPages > 1 && (
-          <div className="pagination">
-            <button
-              type="button"
-              onClick={() => setPage(Math.max(1, page - 1))}
-              disabled={page === 1}
-            >
-              Previous
-            </button>
+          {signInFailed && (
+            <p className="notice" role="alert">
+              Sign-in with GitHub didn&rsquo;t complete. Try again from the menu.
+            </p>
+          )}
 
-            <span>
-              Page {page} of {totalPages}
-            </span>
-
-            <button
-              type="button"
-              onClick={() => setPage(Math.min(totalPages, page + 1))}
-              disabled={page === totalPages}
-            >
-              Next
-            </button>
+          <div className="issues-list">
+            {listMessage ? (
+              <p className="empty-state">{listMessage}</p>
+            ) : (
+              shownIssues.map((issue) => (
+                <IssueCard
+                  key={issue.id}
+                  title={issue.title}
+                  description={issue.description}
+                  label={issue.label}
+                  language={issue.language}
+                  repo={issue.repo}
+                  url={issue.url}
+                  comments={issue.comments}
+                  updatedAt={issue.updatedAt}
+                  saved={savedIds.has(issue.id)}
+                  onToggleSave={signedIn ? () => toggleSaved(issue) : undefined}
+                  project={projects[issue.repo.replace(" / ", "/")]}
+                />
+              ))
+            )}
           </div>
-        )}
-      </section>
 
-      {projectsOpen && (
-        <ProjectsDialog
-          language={search.filters.language}
-          signedIn={signedIn}
-          onPickProject={(project) => pickFromSuggestions({ project })}
-          onClose={() => setProjectsOpen(false)}
-        />
-      )}
-    </main>
+          {!listMessage && totalPages > 1 && (
+            <div className="pagination">
+              <button
+                type="button"
+                onClick={() => setPage(Math.max(1, page - 1))}
+                disabled={page === 1}
+              >
+                Previous
+              </button>
+
+              <span>
+                Page {page} of {totalPages}
+              </span>
+
+              <button
+                type="button"
+                onClick={() => setPage(Math.min(totalPages, page + 1))}
+                disabled={page === totalPages}
+              >
+                Next
+              </button>
+            </div>
+          )}
+        </section>
+
+        {projectsOpen && (
+          <ProjectsDialog
+            language={search.filters.language}
+            signedIn={signedIn}
+            onPickProject={(project) => pickFromSuggestions({ project })}
+            onClose={() => setProjectsOpen(false)}
+          />
+        )}
+      </main>
+      <Footer
+        signedIn={signedIn}
+        reportsAvailable={account.reportsAvailable}
+        onPreset={(preset) => {
+          applyPreset(preset);
+          scrollToResults();
+        }}
+        onShowPopular={() => {
+          applyFilters({ ...search.filters, popular: true, project: "" });
+          scrollToResults();
+        }}
+        onShowSaved={showSaved}
+        onShowAbout={() => navMenuRef.current?.showAbout()}
+        onShowReport={() => navMenuRef.current?.showReport()}
+      />
+    </>
   );
 }
 

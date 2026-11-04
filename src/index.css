@@ -40,6 +40,7 @@
   --success: #1a7f37;
   --done: #8250df;
   --counter-bg: #818b981f;
+  --footer-button-bg: #ffffff;
 
   color-scheme: light;
   font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont,
@@ -94,6 +95,7 @@
   --success: #3fb950;
   --done: #ab7df8;
   --counter-bg: #656c7633;
+  --footer-button-bg: #212830;
 
   color-scheme: dark;
 }
