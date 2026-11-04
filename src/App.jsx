@@ -18,6 +18,7 @@ import {
   reposInQuery,
   searchPath,
   stateFromUrl,
+  regionalName,
   stateToUrl,
   toIssue,
 } from "./search";
@@ -474,6 +475,7 @@ function App() {
       ...NO_FILTERS,
       ...preset.filters,
       language: search.filters.language,
+      regional: search.filters.regional,
       project: search.filters.project,
       sort: search.filters.sort,
     });
@@ -771,6 +773,14 @@ function App() {
 
               {popularRepos.length > 0 && results.status === "ready" && (
                 <p className="view-note">From popular, active projects: {popularNote}.</p>
+              )}
+
+              {search.filters.regional && (
+                <p className="view-note">
+                  Issues that mention {regionalName(search.filters.regional)}, such as
+                  translation work. GitHub can&rsquo;t filter by the language an issue
+                  is written in.
+                </p>
               )}
 
               {recommendation && (

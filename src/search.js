@@ -1,3 +1,5 @@
+import { SPOKEN_LANGUAGES } from "./spokenLanguages";
+
 // Turns the site's filters into a GitHub issue search, and back and forth
 // between the filters and the page address (so a search can be shared).
 
@@ -56,6 +58,7 @@ export const DEFAULT_FILTERS = {
   comments: "any",
   updated: "any",
   language: "",
+  regional: "",
   project: "",
   popular: false,
   sort: "updated",
@@ -100,6 +103,23 @@ function isoDaysAgo(days) {
 
 const UPDATED_DAYS = { today: 0, week: 7, month: 30 };
 
+const spokenLanguage = (code) =>
+  SPOKEN_LANGUAGES.find((language) => language.code === code);
+
+// The everyday English name: "Hindi", or "Greek" for "Greek, Modern".
+export function regionalName(code) {
+  return spokenLanguage(code)?.name.split(",")[0].trim() ?? "";
+}
+
+// GitHub can't filter by the language an issue is written in, so this finds
+// issues that mention the language, in English or in its own script.
+function regionalTerms(code) {
+  const language = spokenLanguage(code);
+  if (!language) return "";
+  const terms = [regionalName(code), language.native].filter(Boolean).map(quote);
+  return terms.length > 1 ? `(${terms.join(" OR ")})` : terms[0];
+}
+
 // Quotes values with spaces or symbols, e.g. "good first issue" or "C++".
 const quote = (value) => (/^[\w-]+$/.test(value) ? value : `"${value}"`);
 
@@ -121,6 +141,7 @@ export function buildQuery(filters, text, repos = []) {
     parts.push(`updated:>=${isoDaysAgo(UPDATED_DAYS[filters.updated])}`);
   }
   if (filters.language) parts.push(`language:${quote(filters.language)}`);
+  if (filters.regional) parts.push(regionalTerms(filters.regional));
   if (filters.project) {
     parts.push(
       `${filters.project.includes("/") ? "repo" : "org"}:${filters.project}`,
@@ -190,7 +211,7 @@ export function popularReposPath(filters) {
 export function stateFromUrl(search) {
   const params = new URLSearchParams(search);
   const known = ["q", "labels", "available", "nopr", "comments", "updated",
-    "lang", "project", "popular", "sort", "page"];
+    "lang", "region", "project", "popular", "sort", "page"];
   if (!known.some((key) => params.has(key))) {
     return { filters: DEFAULT_FILTERS, text: "", page: 1 };
   }
@@ -198,6 +219,7 @@ export function stateFromUrl(search) {
   const pick = (key, options, fallback) =>
     params.get(key) in options ? params.get(key) : fallback;
   const language = params.get("lang") || "";
+  const regional = params.get("region") || "";
   const project = params.get("project") || "";
 
   return {
@@ -210,6 +232,7 @@ export function stateFromUrl(search) {
       comments: pick("comments", COMMENT_OPTIONS, "any"),
       updated: pick("updated", UPDATED_OPTIONS, "any"),
       language: LANGUAGES.includes(language) ? language : "",
+      regional: spokenLanguage(regional) ? regional : "",
       project: isValidProject(project) ? project : "",
       popular: params.get("popular") === "1",
       sort: pick("sort", SORT_OPTIONS, "updated"),
@@ -231,6 +254,7 @@ export function stateToUrl(filters, text, page) {
   if (filters.comments !== "any") params.set("comments", filters.comments);
   if (filters.updated !== "any") params.set("updated", filters.updated);
   if (filters.language) params.set("lang", filters.language);
+  if (filters.regional) params.set("region", filters.regional);
   if (filters.project) params.set("project", filters.project);
   if (filters.popular) params.set("popular", "1");
   if (filters.sort !== "updated") params.set("sort", filters.sort);
@@ -257,6 +281,7 @@ export function activeFilterChips(filters) {
   add(filters.comments !== "any", "comments", `Comments: ${COMMENT_OPTIONS[filters.comments]}`, { comments: "any" });
   add(filters.updated !== "any", "updated", `Updated: ${UPDATED_OPTIONS[filters.updated]}`, { updated: "any" });
   add(Boolean(filters.language), "language", filters.language, { language: "" });
+  add(Boolean(filters.regional), "regional", `Mentions ${regionalName(filters.regional)}`, { regional: "" });
   add(Boolean(filters.project), "project", filters.project, { project: "" });
   add(filters.popular && !filters.project, "popular", "Popular projects only", { popular: false });
 

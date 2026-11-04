@@ -8,6 +8,17 @@ import {
   UPDATED_OPTIONS,
   isValidProject,
 } from "../search";
+import { INDIAN_LANGUAGE_CODES, SPOKEN_LANGUAGES } from "../spokenLanguages";
+
+const languageOption = ({ code, name, native }) => (
+  <option key={code} value={code}>
+    {native ? `${name} (${native})` : name}
+  </option>
+);
+
+const INDIAN_LANGUAGES = SPOKEN_LANGUAGES.filter(({ code }) =>
+  INDIAN_LANGUAGE_CODES.includes(code),
+);
 
 // Mounted only while open, so it always starts from the current filters.
 // Changes stay a draft until "Show results", so trying options out doesn't
@@ -18,6 +29,7 @@ function FiltersPanel({ id, filters, onApply, onClose }) {
   const panelRef = useRef(null);
   const projectId = useId();
   const languageId = useId();
+  const regionalId = useId();
   const sortId = useId();
   const projectHintId = useId();
   const popularHintId = useId();
@@ -75,7 +87,7 @@ function FiltersPanel({ id, filters, onApply, onClose }) {
       <div className="filters-top">
         <div className="filter-field">
           <label className="filter-label" htmlFor={languageId}>
-            Language
+            Programming language
           </label>
           <select
             id={languageId}
@@ -93,6 +105,22 @@ function FiltersPanel({ id, filters, onApply, onClose }) {
         </div>
 
         <div className="filter-field">
+          <label className="filter-label" htmlFor={regionalId}>
+            Regional language
+          </label>
+          <select
+            id={regionalId}
+            className="filter-select"
+            value={draft.regional}
+            onChange={(event) => update({ regional: event.target.value })}
+          >
+            <option value="">Any language</option>
+            <optgroup label="Indian languages">{INDIAN_LANGUAGES.map(languageOption)}</optgroup>
+            <optgroup label="All languages">{SPOKEN_LANGUAGES.map(languageOption)}</optgroup>
+          </select>
+        </div>
+
+        <div className="filter-field">
           <label className="filter-label" htmlFor={projectId}>
             Project or organisation
           </label>
@@ -100,7 +128,7 @@ function FiltersPanel({ id, filters, onApply, onClose }) {
             id={projectId}
             className="filter-input"
             type="text"
-            placeholder="Any project, e.g. vercel/next.js"
+            placeholder="e.g. vercel/next.js"
             value={draft.project}
             aria-invalid={!projectValid}
             aria-describedby={projectValid ? undefined : projectHintId}
