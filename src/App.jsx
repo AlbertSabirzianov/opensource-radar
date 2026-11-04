@@ -7,9 +7,17 @@ import IssueCard from "./components/IssueCard";
 import Logo from "./components/Logo";
 import NavMenu from "./components/NavMenu";
 import ProjectsDialog from "./components/ProjectsDialog";
+import SearchLimitNotice from "./components/SearchLimitNotice";
 import SearchBar from "./components/SearchBar";
 import { githubUrl } from "./github";
 import { ABOUT_PATH, isPlainClick } from "./links";
+import {
+  MAX_LIMIT_RETRIES,
+  fetchShared,
+  isRateLimited,
+  limitWaitSeconds,
+  retryDelayMs,
+} from "./rateLimit";
 import {
   DEFAULT_FILTERS,
   MAX_RESULTS,
@@ -157,18 +165,10 @@ function getInitialThemePreference() {
   return "system";
 }
 
-function searchLimitMessage(response, signedIn, signInAvailable) {
-  const reset = Number(response.headers.get("x-ratelimit-reset"));
-  const seconds = reset ? Math.max(1, Math.ceil(reset - Date.now() / 1000)) : 0;
-  const wait = seconds ? `Try again in ${seconds} seconds` : "Try again in a minute";
-
-  if (signedIn) {
-    return `GitHub allows 30 searches a minute. ${wait}.`;
-  }
-  return `GitHub allows 10 searches a minute without signing in. ${wait}${
-    signInAvailable ? ", or sign in from the menu for more" : ""
+const searchLimitMessage = (signedIn, signInAvailable) =>
+  `GitHub is still limiting searches${signedIn ? "" : " on this network"}. Try again in a minute${
+    !signedIn && signInAvailable ? ", or sign in from the menu for more" : ""
   }.`;
-}
 
 const routeFromPath = () =>
   window.location.pathname === ABOUT_PATH ? "about" : "search";
@@ -293,6 +293,8 @@ function App() {
   // "search" or "saved": which list is shown.
   const [view, setView] = useState("search");
   const [route, setRoute] = useState(routeFromPath);
+  const [retryTick, setRetryTick] = useState(0);
+  const limitRetries = useRef({ key: "", count: 0 });
   const [savedPage, setSavedPage] = useState(1);
   const filtersPanelId = useId();
   const navMenuRef = useRef(null);
@@ -330,10 +332,38 @@ function App() {
     if (!account.checked || view === "saved" || route === "about") return undefined;
 
     let cancelled = false;
+    let retryTimer;
     const { filters } = search;
     const language = filters.language;
     const usePopular = filters.popular && !filters.project;
     const cacheKey = usePopular ? `${path}&popular` : path;
+
+    if (limitRetries.current.key !== cacheKey) {
+      limitRetries.current = { key: cacheKey, count: 0 };
+    }
+
+    // At GitHub's limit: wait for it to reset and search again by ourselves,
+    // up to a point. A different search in the meantime cancels the wait.
+    const waitForLimit = (response) => {
+      limitRetries.current.count += 1;
+      if (limitRetries.current.count > MAX_LIMIT_RETRIES) {
+        setResults({
+          status: "error",
+          items: [],
+          total: 0,
+          message: searchLimitMessage(signedIn, account.signInAvailable),
+        });
+        return;
+      }
+      const delay = retryDelayMs(limitWaitSeconds(response.headers));
+      setResults({
+        status: "waiting",
+        items: [],
+        total: 0,
+        retryAt: Date.now() + delay,
+      });
+      retryTimer = setTimeout(() => setRetryTick((tick) => tick + 1), delay);
+    };
 
     // Handles the answers every GitHub search can give besides success.
     // Returns true when it has dealt with the response.
@@ -344,12 +374,16 @@ function App() {
         setAccount((current) => ({ ...current, user: null }));
         return true;
       }
-      if (response.status === 403 || response.status === 429) {
+      if (isRateLimited(response)) {
+        waitForLimit(response);
+        return true;
+      }
+      if (response.status === 403) {
         setResults({
           status: "error",
           items: [],
           total: 0,
-          message: searchLimitMessage(response, signedIn, account.signInAvailable),
+          message: "GitHub didn't allow this search. Try again in a minute.",
         });
         return true;
       }
@@ -375,9 +409,13 @@ function App() {
         return cached.value;
       }
 
-      const response = await fetch(githubUrl(reposPath, signedIn));
-      if (cancelled || handleProblem(response)) return null;
+      const response = await fetchShared(githubUrl(reposPath, signedIn));
+      if (!response.ok) {
+        if (!cancelled) handleProblem(response);
+        return null;
+      }
 
+      // Kept even if this search was abandoned, so it wasn't spent for nothing.
       const quietSince = Date.now() - QUIET_AFTER_DAYS * 24 * 60 * 60 * 1000;
       const repos = ((await response.json()).items || []).map((repo) => ({
         name: repo.full_name,
@@ -389,7 +427,7 @@ function App() {
         },
       }));
       popularCache.set(reposPath, { time: Date.now(), value: repos });
-      return repos;
+      return cancelled ? null : repos;
     }
 
     async function runSearch() {
@@ -429,18 +467,23 @@ function App() {
           );
         }
 
-        const response = await fetch(githubUrl(issuesPath, signedIn));
-        if (cancelled || handleProblem(response)) return;
+        const response = await fetchShared(githubUrl(issuesPath, signedIn));
+        if (!response.ok) {
+          if (!cancelled) handleProblem(response);
+          return;
+        }
 
         const data = await response.json();
-        if (cancelled) return;
-
         const value = {
           items: (data.items || []).map((item) => toIssue(item, language)),
           total: data.total_count || 0,
           popularRepos,
         };
+        // Kept even if this search was abandoned, so it wasn't spent for nothing.
         searchCache.set(cacheKey, { time: Date.now(), value });
+        if (cancelled) return;
+
+        limitRetries.current.count = 0;
         setResults({ status: "ready", ...value });
       } catch {
         if (!cancelled) {
@@ -458,8 +501,9 @@ function App() {
 
     return () => {
       cancelled = true;
+      clearTimeout(retryTimer);
     };
-  }, [path, search, account.checked, signedIn, view, route, account.signInAvailable]);
+  }, [path, search, account.checked, signedIn, view, route, account.signInAvailable, retryTick]);
 
   const scrollToResults = () =>
     document
@@ -659,6 +703,8 @@ function App() {
       "You haven't saved any issues yet. Use the bookmark on an issue to save it here.";
   } else if (view === "search" && results.status === "loading") {
     listMessage = "Searching GitHub...";
+  } else if (view === "search" && results.status === "waiting") {
+    listMessage = "Waiting for GitHub's search limit to reset.";
   } else if (view === "search" && results.status === "error") {
     listMessage = results.message;
   } else if (
@@ -862,7 +908,13 @@ function App() {
           )}
 
           <div className="issues-list">
-            {listMessage ? (
+            {view === "search" && results.status === "waiting" ? (
+              <SearchLimitNotice
+                retryAt={results.retryAt}
+                signedIn={signedIn}
+                signInAvailable={account.signInAvailable}
+              />
+            ) : listMessage ? (
               <p className="empty-state">{listMessage}</p>
             ) : (
               shownIssues.map((issue) => (
