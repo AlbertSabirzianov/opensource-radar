@@ -1,5 +1,10 @@
 import { useEffect, useId, useImperativeHandle, useRef, useState } from "react";
-import { CONTRIBUTION_GUIDE_URL, REPORT_PROBLEM_URL } from "../links";
+import {
+  ABOUT_PATH,
+  CONTRIBUTION_GUIDE_URL,
+  REPORT_PROBLEM_URL,
+  isPlainClick,
+} from "../links";
 import ContributionsDialog from "./ContributionsDialog";
 import ReportDialog from "./ReportDialog";
 import Icon from "./Icon";
@@ -32,6 +37,7 @@ function NavMenu({
   savedCount,
   onShowSaved,
   onShowRecommended,
+  onShowAbout,
   reportsAvailable,
   theme,
   ref,
@@ -42,17 +48,11 @@ function NavMenu({
   const wrapperRef = useRef(null);
   const triggerRef = useRef(null);
   const menuRef = useRef(null);
-  const aboutRef = useRef(null);
   const returnFocusRef = useRef(null);
   const menuId = useId();
-  const aboutTitleId = useId();
 
-  // Lets the footer open these dialogs; focus then returns to the footer link.
+  // Lets the footer open the report form; focus then returns to the footer link.
   useImperativeHandle(ref, () => ({
-    showAbout() {
-      returnFocusRef.current = document.activeElement;
-      aboutRef.current?.showModal();
-    },
     showReport() {
       returnFocusRef.current = document.activeElement;
       setReportOpen(true);
@@ -265,18 +265,20 @@ function NavMenu({
               <Icon name="linkExternal" />
             </span>
           </a>
-          <button
-            type="button"
+          <a
             role="menuitem"
             className="menu-item"
-            onClick={() => {
+            href={ABOUT_PATH}
+            onClick={(event) => {
+              if (!isPlainClick(event)) return;
+              event.preventDefault();
               closeMenu();
-              aboutRef.current?.showModal();
+              onShowAbout();
             }}
           >
             <Icon name="info" />
             About OpenSource Radar
-          </button>
+          </a>
           {reportsAvailable ? (
             <button
               type="button"
@@ -349,47 +351,6 @@ function NavMenu({
           }}
         />
       )}
-
-      <dialog
-        ref={aboutRef}
-        className="about-dialog"
-        aria-labelledby={aboutTitleId}
-        onClick={(event) => {
-          // A click on the dialog element itself is a click on the backdrop.
-          if (event.target === aboutRef.current) {
-            aboutRef.current.close();
-          }
-        }}
-        onClose={restoreDialogFocus}
-      >
-        <div className="about-header">
-          <h2 id={aboutTitleId}>About OpenSource Radar</h2>
-          <button
-            type="button"
-            className="icon-button"
-            aria-label="Close"
-            onClick={() => aboutRef.current?.close()}
-          >
-            <Icon name="x" />
-          </button>
-        </div>
-        <div className="about-body">
-          <p>
-            OpenSource Radar helps you find open issues to contribute to,
-            including ones labeled &ldquo;good first issue&rdquo; and
-            &ldquo;help wanted&rdquo;.
-          </p>
-          <p>
-            It searches open issues across all public projects on GitHub,
-            using GitHub&rsquo;s own search. Results are kept for a few
-            minutes so going back and forth stays quick.
-          </p>
-          <p>
-            GitHub allows 10 searches a minute for visitors and 30 a minute
-            when you&rsquo;re signed in.
-          </p>
-        </div>
-      </dialog>
     </div>
   );
 }

@@ -1,10 +1,12 @@
 import {
+  ABOUT_PATH,
   CONTRIBUTING_URL,
   CONTRIBUTION_GUIDE_URL,
   CONTRIBUTORS_URL,
   LICENSE_URL,
   REPORT_PROBLEM_URL,
   REPO_URL,
+  isPlainClick,
 } from "../links";
 import { BEGINNER_PRESETS } from "../search";
 import Icon from "./Icon";
@@ -104,7 +106,17 @@ function Footer({
           <h2>Project</h2>
           <ul>
             <li>
-              <FooterButton onClick={onShowAbout}>About</FooterButton>
+              <a
+                className="footer-link"
+                href={ABOUT_PATH}
+                onClick={(event) => {
+                  if (!isPlainClick(event)) return;
+                  event.preventDefault();
+                  onShowAbout();
+                }}
+              >
+                About
+              </a>
             </li>
             <li>
               <ExternalLink href={REPO_URL}>GitHub repository</ExternalLink>
