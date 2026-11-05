@@ -1,7 +1,6 @@
 import {
   ABOUT_PATH,
   CONTRIBUTING_URL,
-  CONTRIBUTION_GUIDE_URL,
   CONTRIBUTORS_URL,
   LICENSE_URL,
   REPORT_PROBLEM_URL,
@@ -9,6 +8,7 @@ import {
   isPlainClick,
 } from "../links";
 import { BEGINNER_PRESETS } from "../search";
+import { GUIDE_PATH } from "../seoPages";
 import Icon from "./Icon";
 import Logo from "./Logo";
 
@@ -134,9 +134,9 @@ function Footer({
           <h2>Help</h2>
           <ul>
             <li>
-              <ExternalLink href={CONTRIBUTION_GUIDE_URL}>
+              <a className="footer-link" href={GUIDE_PATH}>
                 First contribution guide
-              </ExternalLink>
+              </a>
             </li>
             <li>
               <ExternalLink href={CONTRIBUTING_URL}>Contributing guide</ExternalLink>

@@ -1874,3 +1874,142 @@ body {
   margin-top: 6px;
   font-size: 14px;
 }
+
+/* Fixed text below the results, and the language links */
+.search-help {
+  width: min(900px, 92%);
+  margin: 0 auto;
+  padding: 16px 0 56px;
+  color: var(--text);
+}
+
+.search-help-section {
+  margin-top: 40px;
+}
+
+.search-help-section > h2 {
+  margin: 0 0 12px;
+  font-size: 22px;
+  letter-spacing: -0.01em;
+}
+
+.search-help-section > p {
+  max-width: 720px;
+  margin: 0 0 12px;
+  color: var(--muted);
+  font-size: 15px;
+  line-height: 1.6;
+}
+
+.search-help-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 14px;
+}
+
+.search-help-item {
+  padding: 18px 20px;
+  border: 1px solid var(--border-card);
+  border-radius: 12px;
+  background: var(--surface);
+}
+
+.search-help-item h3 {
+  margin: 0 0 6px;
+  font-size: 15px;
+}
+
+.search-help-item p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+.search-help-section .search-help-more {
+  margin: 16px 0 0;
+}
+
+.search-help-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.search-help-links a {
+  display: inline-block;
+  padding: 6px 14px;
+  border: 1px solid var(--border-card);
+  border-radius: 999px;
+  color: var(--text);
+  font-size: 14px;
+  text-decoration: none;
+}
+
+.search-help-links a:hover {
+  border-color: var(--link);
+  color: var(--link);
+}
+
+.search-help a:focus-visible,
+.guide-step a:focus-visible {
+  border-radius: 6px;
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.search-help-section > p a,
+.aboutpage-section > .search-help-more a {
+  color: var(--link);
+}
+
+.search-help-commands {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-width: 720px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.search-help-commands li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px 16px;
+  padding: 10px 14px;
+  border: 1px solid var(--border-card);
+  border-radius: 10px;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.search-help-commands code {
+  color: var(--text);
+  font-size: 13px;
+}
+
+.aboutpage .guide-step {
+  grid-template-columns: 34px minmax(0, 1fr);
+  align-items: start;
+}
+
+.aboutpage .guide-step div > span {
+  display: block;
+  margin-top: 2px;
+}
+
+.aboutpage .search-help-more {
+  margin: 16px 0 0;
+  color: var(--muted);
+  font-size: 15px;
+}
+
+.search-help .search-help-grid {
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+}

@@ -1,3 +1,4 @@
+import { languagePageFor, languagePageForPath } from "./seoPages";
 import { SPOKEN_LANGUAGES } from "./spokenLanguages";
 
 // Turns the site's filters into a GitHub issue search, and back and forth
@@ -243,6 +244,27 @@ export function stateFromUrl(search) {
       MAX_RESULTS / PER_PAGE,
     ),
   };
+}
+
+// A language's own page (/good-first-issues/python) opens that language's search.
+export function stateFromLocation(pathname, search) {
+  const page = languagePageForPath(pathname);
+  if (page && !search) {
+    return { filters: { ...DEFAULT_FILTERS, language: page.language }, text: "", page: 1 };
+  }
+  return stateFromUrl(search);
+}
+
+// The language page that shows exactly this search, if there is one: only the
+// language differs from the default search, with no words and on the first page.
+export function languagePageForSearch({ filters, text, page }) {
+  if (text || page !== 1 || !filters.language) return null;
+  const same = Object.keys(DEFAULT_FILTERS).every(
+    (key) =>
+      key === "language" ||
+      JSON.stringify(filters[key]) === JSON.stringify(DEFAULT_FILTERS[key]),
+  );
+  return same ? languagePageFor(filters.language) : null;
 }
 
 export function stateToUrl(filters, text, page) {

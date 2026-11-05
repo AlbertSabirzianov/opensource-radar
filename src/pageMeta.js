@@ -1,28 +1,15 @@
-// index.html holds the home page's details. This swaps them for the About
-// page, so search engines treat it as its own page rather than a copy of home.
-const SITE_URL = "https://opensource-radar.com";
-
-const ABOUT = {
-  title: "About OpenSource Radar – Find Your First Open-Source Issue",
-  description:
-    "Why OpenSource Radar exists, how to find a good first issue and make your first open-source contribution, and what the site stores about you.",
-  url: `${SITE_URL}/about`,
-};
+// Each page's HTML already has the right details (see scripts/prerender.js).
+// This keeps them right as a visitor moves between pages without a reload.
+import { SITE_URL } from "./seoPages";
 
 const description = () => document.head.querySelector('meta[name="description"]');
 const canonical = () => document.head.querySelector('link[rel="canonical"]');
 const ogUrl = () => document.head.querySelector('meta[property="og:url"]');
 
-const HOME = {
-  title: document.title,
-  description: description()?.content,
-  url: canonical()?.href,
-};
-
-export function setPageMeta(route) {
-  const page = route === "about" ? ABOUT : HOME;
+export function setPageMeta(page) {
+  const url = `${SITE_URL}${page.path}`;
   document.title = page.title;
   description()?.setAttribute("content", page.description);
-  canonical()?.setAttribute("href", page.url);
-  ogUrl()?.setAttribute("content", page.url);
+  canonical()?.setAttribute("href", url);
+  ogUrl()?.setAttribute("content", url);
 }
