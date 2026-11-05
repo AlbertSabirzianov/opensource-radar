@@ -6,6 +6,8 @@ OpenSource Radar helps developers find open issues they can contribute to, acros
 
 🌐 **Live site:** [opensource-radar.com](https://opensource-radar.com/)
 
+![](docs/screenshot.png)
+
 ## ✨ Features
 
 - 🔍 **Search all of GitHub** — live search over open issues in every public repository
