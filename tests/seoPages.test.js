@@ -56,6 +56,27 @@ describe("page list", () => {
   });
 });
 
+describe("structured data", () => {
+  const graph = JSON.parse(
+    template.match(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/)[1],
+  )["@graph"];
+  const ofType = (type) => graph.find((item) => item["@type"] === type);
+
+  it("gives Google the site's name on the home page", () => {
+    const site = ofType("WebSite");
+    expect(site.name).toBe("OpenSource Radar");
+    expect(site.url).toBe(`${SITE_URL}/`);
+    expect(site.alternateName[0]).toBe("Open Source Radar");
+  });
+
+  it("links the site to its organisation, with a logo in the public folder", () => {
+    const organization = ofType("Organization");
+    expect(ofType("WebSite").publisher["@id"]).toBe(organization["@id"]);
+    const logo = organization.logo.replace(SITE_URL, "public");
+    expect(fs.existsSync(logo)).toBe(true);
+  });
+});
+
 describe("languagePageForPath", () => {
   it("finds a page, with or without a trailing slash", () => {
     expect(languagePageForPath("/good-first-issues/python")).toBe(python);
