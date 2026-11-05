@@ -2,16 +2,19 @@ import { useEffect, useId, useRef, useState } from "react";
 import AboutPage from "./components/AboutPage";
 import FiltersPanel from "./components/FiltersPanel";
 import Footer from "./components/Footer";
+import GuidePage from "./components/GuidePage";
 import Icon from "./components/Icon";
 import IssueCard from "./components/IssueCard";
 import Logo from "./components/Logo";
 import NavMenu from "./components/NavMenu";
 import ProjectsDialog from "./components/ProjectsDialog";
+import SearchHelp from "./components/SearchHelp";
 import SearchLimitNotice from "./components/SearchLimitNotice";
 import SearchBar from "./components/SearchBar";
 import { githubUrl } from "./github";
 import { ABOUT_PATH, isPlainClick } from "./links";
 import { setPageMeta } from "./pageMeta";
+import { ABOUT, GUIDE, GUIDE_PATH, HOME } from "./seoPages";
 import {
   MAX_LIMIT_RETRIES,
   fetchShared,
@@ -26,10 +29,11 @@ import {
   SORT_OPTIONS,
   activeFilterChips,
   countActiveFilters,
+  languagePageForSearch,
   popularReposPath,
   reposInQuery,
   searchPath,
-  stateFromUrl,
+  stateFromLocation,
   regionalName,
   stateToUrl,
   toIssue,
@@ -171,8 +175,12 @@ const searchLimitMessage = (signedIn, signInAvailable) =>
     !signedIn && signInAvailable ? ", or sign in from the menu for more" : ""
   }.`;
 
-const routeFromPath = () =>
-  window.location.pathname === ABOUT_PATH ? "about" : "search";
+const routeFromPath = () => {
+  const { pathname } = window.location;
+  if (pathname === ABOUT_PATH) return "about";
+  if (pathname === GUIDE_PATH) return "guide";
+  return "search";
+};
 
 function App() {
   const [themePreference, setThemePreference] = useState(
@@ -280,7 +288,9 @@ function App() {
 
   // The search that's on screen: filters, words and page. It starts from
   // the address bar, so a shared link opens the same search.
-  const [search, setSearch] = useState(() => stateFromUrl(window.location.search));
+  const [search, setSearch] = useState(() =>
+    stateFromLocation(window.location.pathname, window.location.search),
+  );
   const [inputText, setInputText] = useState(search.text);
   const [results, setResults] = useState({ status: "loading", items: [], total: 0 });
   // Stars, activity and contributing guide per project ("owner/repo").
@@ -301,17 +311,18 @@ function App() {
     document.querySelector(".filters-button")?.focus();
 
   const path = searchPath(search.filters, search.text, search.page);
+  const languagePage = languagePageForSearch(search);
 
   // Keep the address bar in step with the search (this also drops the
   // one-off "?signin=failed" once it has been read).
   useEffect(() => {
-    if (route === "about") return;
+    if (route !== "search") return;
     window.history.replaceState(
       null,
       "",
-      stateToUrl(search.filters, search.text, search.page),
+      languagePage?.path ?? `/${stateToUrl(search.filters, search.text, search.page)}`,
     );
-  }, [search, route]);
+  }, [search, route, languagePage]);
 
   // The browser's back and forward buttons move between search and About.
   useEffect(() => {
@@ -321,13 +332,15 @@ function App() {
   }, []);
 
   useEffect(() => {
-    setPageMeta(route);
-  }, [route]);
+    if (route === "about") setPageMeta(ABOUT);
+    else if (route === "guide") setPageMeta(GUIDE);
+    else setPageMeta(languagePage ?? HOME);
+  }, [route, languagePage]);
 
   useEffect(() => {
     // Wait until we know whether the visitor is signed in, so the search
     // goes through the right route (and their own limit) the first time.
-    if (!account.checked || view === "saved" || route === "about") return undefined;
+    if (!account.checked || view === "saved" || route !== "search") return undefined;
 
     let cancelled = false;
     let retryTimer;
@@ -516,15 +529,15 @@ function App() {
     window.scrollTo(0, 0);
   };
 
-  const leaveAbout = () => {
-    if (route !== "about") return;
+  const backToSearch = () => {
+    if (route === "search") return;
     window.history.pushState(null, "", "/");
     setRoute("search");
     window.scrollTo(0, 0);
   };
 
   const runNewSearch = (changes) => {
-    leaveAbout();
+    backToSearch();
     setSearch((current) => ({ ...current, ...changes, page: 1 }));
     setView("search");
     setFiltersOpen(false);
@@ -565,7 +578,7 @@ function App() {
     if (!isPlainClick(event)) return;
 
     event.preventDefault();
-    leaveAbout();
+    backToSearch();
     setInputText("");
     setRecommendation(null);
     setFiltersOpen(false);
@@ -598,7 +611,7 @@ function App() {
   };
 
   const showSaved = () => {
-    leaveAbout();
+    backToSearch();
     setView("saved");
     setSavedPage(1);
     scrollToResults();
@@ -607,7 +620,7 @@ function App() {
   // Beginner issues in the language the user codes in most (from their
   // public repositories), with their other languages one click away.
   const showRecommended = async () => {
-    leaveAbout();
+    backToSearch();
     try {
       const response = await fetch(
         githubUrl("/user/repos?per_page=100&sort=pushed&affiliation=owner", true),
@@ -744,12 +757,15 @@ function App() {
           </div>
         </nav>
 
-        {route === "about" && <AboutPage onBack={leaveAbout} />}
+        {route === "about" && <AboutPage onBack={backToSearch} />}
+        {route === "guide" && <GuidePage onBack={backToSearch} />}
 
-        <section className="hero" hidden={route === "about"}>
+        <section className="hero" hidden={route !== "search"}>
           <p className="eyebrow">YOUR OPEN-SOURCE JOURNEY STARTS HERE</p>
-          <h1>Find your first open-source issue.</h1>
-          <p className="description">Search open issues across all of GitHub.</p>
+          <h1>{languagePage?.heading ?? "Find your first open-source issue."}</h1>
+          <p className="description">
+            {languagePage?.intro ?? "Search open issues across all of GitHub."}
+          </p>
 
           <SearchBar
             text={inputText}
@@ -781,7 +797,7 @@ function App() {
           )}
         </section>
 
-        <section className="issues-section" aria-live="polite" hidden={route === "about"}>
+        <section className="issues-section" aria-live="polite" hidden={route !== "search"}>
           {view === "saved" ? (
             <>
               <div className="issues-header">
@@ -958,6 +974,8 @@ function App() {
             </div>
           )}
         </section>
+
+        {route === "search" && view === "search" && <SearchHelp languagePage={languagePage} />}
 
         {projectsOpen && (
           <ProjectsDialog

@@ -1,7 +1,9 @@
 import react from '@vitejs/plugin-react'
 import { existsSync } from 'node:fs'
+import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { defineConfig, loadEnv } from 'vite'
+import { prerender } from './scripts/prerender.js'
 
 const SERVER_ENV_KEYS = [
   'GITHUB_CLIENT_ID',
@@ -74,6 +76,21 @@ function vercelFunctions() {
   }
 }
 
+// After a build, gives each page its own HTML file and writes the sitemap.
+function prerenderPages() {
+  let outDir
+  return {
+    name: 'prerender-pages',
+    apply: 'build',
+    configResolved(config) {
+      outDir = path.resolve(config.root, config.build.outDir)
+    },
+    closeBundle() {
+      prerender(outDir)
+    },
+  }
+}
+
 // https://vite.dev/config/
 export default defineConfig(({ mode }) => {
   // Hand the server-side settings from .env.local to the functions above. They
@@ -84,6 +101,6 @@ export default defineConfig(({ mode }) => {
   }
 
   return {
-    plugins: [react(), vercelFunctions()],
+    plugins: [react(), vercelFunctions(), prerenderPages()],
   }
 })

@@ -1,6 +1,8 @@
 {
   "rewrites": [
     { "source": "/auth/:action", "destination": "/api/auth/:action" },
-    { "source": "/about", "destination": "/index.html" }
+    { "source": "/about", "destination": "/about/index.html" },
+    { "source": "/first-contribution", "destination": "/first-contribution/index.html" },
+    { "source": "/good-first-issues/:language", "destination": "/good-first-issues/:language/index.html" }
   ]
 }

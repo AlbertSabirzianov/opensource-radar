@@ -85,8 +85,8 @@
     </script>
   </head>
   <body>
-    <!-- What crawlers and no-JavaScript visitors read. The app replaces it on load. -->
-    <div id="root">
+    <!-- What crawlers and no-JavaScript visitors read. The build fills in each page's own text (scripts/prerender.js), and the app replaces it on load. -->
+    <div id="root"><!-- prerender:start -->
       <main class="app">
         <nav class="navbar"><a class="navbar-brand" href="/">OpenSource Radar</a></nav>
         <section class="hero">
@@ -104,11 +104,7 @@
           </noscript>
         </section>
       </main>
-    </div>
-    <script>
-      // /about shares this file, so don't flash the home page text there first.
-      if (location.pathname === "/about") document.getElementById("root").textContent = "";
-    </script>
+    <!-- prerender:end --></div>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>

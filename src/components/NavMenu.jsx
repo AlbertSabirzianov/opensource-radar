@@ -1,7 +1,7 @@
 import { useEffect, useId, useImperativeHandle, useRef, useState } from "react";
+import { GUIDE_PATH } from "../seoPages";
 import {
   ABOUT_PATH,
-  CONTRIBUTION_GUIDE_URL,
   REPORT_PROBLEM_URL,
   isPlainClick,
 } from "../links";
@@ -254,16 +254,11 @@ function NavMenu({
           <a
             role="menuitem"
             className="menu-item"
-            href={CONTRIBUTION_GUIDE_URL}
-            target="_blank"
-            rel="noopener noreferrer"
+            href={GUIDE_PATH}
             onClick={() => closeMenu()}
           >
             <Icon name="book" />
             First contribution guide
-            <span className="menu-item-trailing">
-              <Icon name="linkExternal" />
-            </span>
           </a>
           <a
             role="menuitem"

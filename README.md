@@ -120,13 +120,15 @@ opensource-radar/
 │   ├── recent.js           # Recent searches, kept in the browser
 │   ├── rateLimit.js        # Waiting out GitHub's limit, sharing repeat requests
 │   ├── links.js            # Links used around the site
+│   ├── seoPages.js         # Text of the language pages, guide and FAQ
 │   ├── pageMeta.js         # Page title and description for search engines
 │   ├── preview.js          # Safe plain-text issue previews
 │   └── github.js           # Chooses direct GitHub or the proxy
+├── scripts/                # Builds each page's HTML and the sitemap
 ├── tests/                  # Automated tests
 ├── .github/                # Issue and pull request templates, CI
 ├── .env.example            # Settings template
-└── vercel.json             # Maps /auth/* to the sign-in functions, and /about to the app
+└── vercel.json             # Maps /auth/* to the sign-in functions, and pages to their own HTML
 ```
 
 ## ⚙️ How it works
